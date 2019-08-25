@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>systemd-boot on tactical-documentation</title>
+    <link>https://tactical-documentation.github.io/tags/systemd-boot/</link>
+    <description>Recent content in systemd-boot on tactical-documentation</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-us</language>
+    <lastBuildDate>Fri, 23 Aug 2019 00:00:00 +0000</lastBuildDate>
+    
+	<atom:link href="https://tactical-documentation.github.io/tags/systemd-boot/index.xml" rel="self" type="application/rss+xml" />
+    
+    
+    <item>
+      <title>Proxmox VE 6 Setup: ZFS, LUKS, systemd-boot and Dropbear</title>
+      <link>https://tactical-documentation.github.io/post/proxmoxve6-zfs-luks-systemdboot-dropbear/</link>
+      <pubDate>Fri, 23 Aug 2019 00:00:00 +0000</pubDate>
+      
+      <guid>https://tactical-documentation.github.io/post/proxmoxve6-zfs-luks-systemdboot-dropbear/</guid>
+      <description>This describes how to set up a fully encrypted Proxmox VE 6 host with ZFS root and unlocking it remotely using the dropbear ssh server. Also it describes how you can do that, while keeping systemd-boot and thus also the pve tooling intactI&amp;rsquo;m not sure if the pve tooling still works if you replace systemd-boot with grub, which seems to be the common solution to setting up this kind of setup,maybe it does .</description>
+    </item>
+    
+  </channel>
+</rss>

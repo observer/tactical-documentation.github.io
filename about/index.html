@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="en-us">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <meta name="HandheldFriendly" content="True">
+    <meta name="MobileOptimized" content="320">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="referrer" content="no-referrer">
+    
+
+    <title>
+      
+      
+         about 
+      
+    </title>
+    <link rel="canonical" href="https://tactical-documentation.github.io/about/">
+
+    <style>
+
+  @font-face {
+    font-family: 'Comfortaa';
+    font-style: normal;
+    font-weight: 400;
+    src: local('Comfortaa Regular'), url('/fonts/Comfortaa-Regular.ttf');
+  }
+  
+  @font-face {
+    font-family: 'Inconsolata';
+    font-style: normal;
+    font-weight: 400;
+    src: local('Inconsolata Regular'), url('/fonts/Inconsolata-Regular.ttf');
+  }
+
+  @font-face {
+    font-family: 'Montserrat';
+    font-style: normal;
+    font-weight: 400;
+    src: local('Montserrat Regular'), url('/fonts/Montserrat-Regular.ttf');
+  }
+  
+  * {
+    border:0;
+    font:inherit;
+    font-size:100%;
+    vertical-align:middle;
+    margin:0;
+    padding:0;
+    color: black;
+    text-decoration-skip: ink;
+  }
+
+  body {
+    font-family: Montserrat, 'Open Sans', 'Myriad Pro', Myriad, sans-serif;
+    font-size:17px;
+    line-height:160%;
+    color:#1d1313;
+    max-width:700px;
+    margin:auto;
+    counter-reset: sidenote-counter;
+  }
+
+
+  label.sidenote-number { display: inline; }
+
+  .sidenote, .marginnote { float: right;
+                         clear: right;
+                         margin-right: -60%;
+                         width: 50%;
+                         margin-top: 0;
+                         margin-bottom: 0;
+                         font-size: 10px;
+                         color: grey;
+                         line-height: 1.3;
+                         vertical-align: baseline;
+                         position: relative; }
+
+  .sidenote-number { counter-increment: sidenote-counter; }
+  
+  .sidenote-number:after, .sidenote:before { font-family: et-book-roman-old-style;
+                                             position: relative;
+                                             vertical-align: baseline; }
+  
+  .sidenote-number:after { content: counter(sidenote-counter);
+                           font-size: 10px;
+                           top: -0.5rem;
+                           left: 0.1rem; }
+  
+  .sidenote:before { content: counter(sidenote-counter) " ";
+                     font-size: 7px;
+                     top: -0.5rem; }
+  
+  blockquote .sidenote, { margin-right: -82%;
+                                                 min-width: 59%;
+                                                 text-align: left; }
+  
+  .marginnote > code,
+  .sidenote > code {
+    font-size: 10px; 
+    padding: 2px;
+  }
+
+
+  p {
+    margin: 20px 0;
+  }
+
+  a img {
+    border:none;
+  }
+
+  img {
+    margin: 10px auto 10px auto;
+    max-width: 100%;
+    display: block;
+  }
+
+  table {
+    display: table;
+    border: 1px solid black;
+    border-collapse: collapse;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  th, td {
+    padding: 5px;
+    border: 1px solid black;
+    text-align: left;
+  }
+
+  .table-caption {
+    text-align:center;
+  }
+  
+  figcaption {
+    text-align:center;
+  }
+
+  th {
+    font-weight: bold;
+  }
+
+  .left-justify {
+    float: left;
+  }
+
+  .right-justify {
+    float:right;
+  }
+
+  pre, code {
+    font: 12px Inconsolata, Consolas, "Liberation Mono", Menlo, Courier, monospace;
+    background-color: #f7f7f7;
+  }
+
+  code {
+    font-size: 12px;
+    padding: 4px;
+  }
+
+  pre {
+    margin-top: 0;
+    margin-bottom: 16px;
+    word-wrap: normal;
+    padding: 16px;
+    overflow: auto;
+    font-size: 85%;
+    line-height: 1.45;
+  }
+
+  pre>code {
+    padding: 0;
+    margin: 0;
+    font-size: 100%;
+    word-break: normal;
+    white-space: pre;
+    background: transparent;
+    border: 0;
+  }
+
+  pre code {
+    display: inline;
+    max-width: auto;
+    padding: 0;
+    margin: 0;
+    overflow: visible;
+    line-height: inherit;
+    word-wrap: normal;
+    background-color: transparent;
+    border: 0;
+  }
+
+  pre code::before,
+  pre code::after {
+    content: normal;
+  }
+
+  em,q,em,dfn {
+    font-style:italic;
+  }
+
+  .sans,html .gist .gist-file .gist-meta {
+    font-family: Montserrat, "Open Sans","Myriad Pro",Myriad,sans-serif;
+  }
+
+  .mono,pre,code,tt,p code,li code {
+    font-family:Inconsolata, Menlo,Monaco,"Andale Mono","lucida console","Courier New",monospace;
+  }
+
+  .heading,.serif,h1,h2,h3 {
+    font-family:"Comfortaa";
+  }
+
+  strong {
+    font-weight:600;
+  }
+
+  q:before {
+    content:"\201C";
+  }
+
+  q:after {
+    content:"\201D";
+  }
+
+  del,s {
+    text-decoration:line-through;
+  }
+
+  blockquote {
+    font-family:"Comfortaa";
+    text-align:center;
+    padding:50px;
+  }
+
+  blockquote p {
+    display:inline-block;
+    font-style:italic;
+  }
+
+  blockquote:before,blockquote:after {
+    font-family:"Comfortaa";
+    content:'\201C';
+    font-size:30px;
+    color:#403c3b;
+  }
+
+  blockquote:after {
+    content:'\201D';
+  }
+
+  hr {
+    width:40%;
+    height: 1px;
+    background:#403c3b;
+    margin: 25px auto;
+  }
+
+  h1 {
+    font-size:35px;
+  }
+
+  h2 {
+    font-size:28px;
+  }
+
+  h3 {
+    font-size:22px;
+    margin-top:18px;
+  }
+
+  h1 a,h2 a,h3 a {
+    text-decoration:none;
+  }
+
+  h1,h2 {
+    margin-top:28px;
+  }
+
+  #sub-header, time {
+    color:#403c3b;
+    font-size:13px;
+  }
+
+  #sub-header {
+    margin: 0 4px;
+  }
+
+  #nav h1 a {
+    font-size:35px;
+    color:#1d1313;
+    line-height:120%;
+  }
+
+  .posts_listing a,#nav a {
+    text-decoration: none;
+  }
+
+  li {
+    margin-left: 20px;
+  }
+
+  ul li {
+    margin-left: 5px;
+  }
+
+  ul li {
+    list-style-type: none;
+  }
+  ul li:before {
+    content:"\00B7 \0020";
+  }
+
+  #nav ul li:before, .posts_listing li:before {
+    content:'';
+    margin-right:0;
+  }
+
+  #content {
+    text-align:left;
+    width:100%;
+    font-size:15px;
+    padding:60px 0 80px;
+  }
+
+  #content h1,#content h2 {
+    margin-bottom:5px;
+  }
+
+  #content h2 {
+    font-size:25px;
+  }
+
+  #content .entry-content {
+    margin-top:15px;
+  }
+
+  #content time {
+    margin-left:3px;
+  }
+
+  #content h1 {
+    font-size:30px;
+  }
+
+  .highlight {
+    margin: 10px 0;
+  }
+
+  .posts_listing {
+    margin:0 0 50px;
+  }
+
+  .posts_listing li {
+    margin:0 0 0 15px;
+  }
+
+  .posts_listing li a:hover,#nav a:hover {
+    text-decoration: underline;
+  }
+
+  #nav {
+    text-align:center;
+    position:static;
+    margin-top:60px;
+  }
+
+  #nav ul {
+    display: table;
+    margin: 8px auto 0 auto;
+  }
+
+  #nav li {
+    list-style-type:none;
+    display:table-cell;
+    font-size:15px;
+    padding: 0 20px;
+  }
+
+  #links {
+    margin: 50px 0 0 0;
+  }
+
+  #links :nth-child(2) {
+    float:right;
+  }
+
+  #not-found {
+    text-align: center;
+  }
+
+  #not-found a {
+    font-family:"Comfortaa";
+    font-size: 200px;
+    text-decoration: none;
+    display: inline-block;
+    padding-top: 225px;
+  }
+
+  #menu a {
+    color: #aaa;
+    font-family: Montserrat, "Menu",sans-serif;
+     
+    font-size: 9.65px;
+    margin-right: 0.85em;
+    text-shadow: 0 1px 1px #fff;
+  }
+
+
+  span.left { float: left; }
+
+  span.right {
+    float: right;
+    margin-right: -0.85em;
+  }
+
+  @media (max-width: 750px) {
+    body {
+      padding-left:20px;
+      padding-right:20px;
+    }
+
+    #nav h1 a {
+      font-size:28px;
+    }
+
+    #nav li {
+      font-size:13px;
+      padding: 0 15px;
+    }
+
+    #content {
+      margin-top:0;
+      padding-top:50px;
+      font-size:14px;
+    }
+
+    #content h1 {
+      font-size:25px;
+    }
+
+    #content h2 {
+      font-size:22px;
+    }
+
+    .posts_listing li div {
+      font-size:12px;
+    }
+
+
+    .sidenote, .marginnote { display: block;
+                             float: left;
+                             left: 1rem;
+                             clear: both;
+                             width: 95%;
+                             line-height: 1;
+                             margin: 1rem 2.5%;
+                             vertical-align: baseline;
+                             position: relative; }
+
+
+  }
+
+  @media (max-width: 400px) {
+    body {
+      padding-left:20px;
+      padding-right:20px;
+    }
+
+    #nav h1 a {
+      font-size:22px;
+    }
+
+    #nav li {
+      font-size:12px;
+      padding: 0 10px;
+    }
+
+    #content {
+      margin-top:0;
+      padding-top:20px;
+      font-size:12px;
+    }
+
+    #content h1 {
+      font-size:20px;
+    }
+
+    #content h2 {
+      font-size:18px;
+    }
+
+    .posts_listing li div{
+      font-size:12px;
+    }
+  }
+</style>
+
+
+  </head>
+
+  <body>
+    <div id="menu">
+      <span class="left" style="display:inline:block">    
+          <font size="10"> <a href="https://tactical-documentation.github.io">tactical-documentation</a> </font>
+      </span>
+      <span class="right" style="display:inline:block">    
+          <font size="10"> <a href="https://tactical-documentation.github.io/tags">tags</a> </font>
+      
+        
+          <font size="10"> <a href="https://tactical-documentation.github.io/about/">about</a> </font>
+        
+      
+        
+      
+        
+          <font size="10"> <a href="https://tactical-documentation.github.io/src/">src</a> </font>
+        
+      
+          <font size="10"> <a href="https://tactical-documentation.github.io/index.xml">rss</a> </font>
+      </span>
+    </div>
+
+
+<section id=content>
+  <h1> about </h1>
+
+  
+    <div id=sub-header>
+      August 2019 · 7 minute read
+    </div>
+  
+
+   
+   
+  
+
+  <div class="entry-content">
+    
+
+<p>This page contains some general information about this blog, first
+a short overview of this project, then a little FAQ-ish section
+with stuff you might want to know about this site and finally there
+is a small showcase of this hugo theme, that I&rsquo;ve put together with
+pretty much no background knowledge.</p>
+
+<p>This project consists of three github repositories<label class="margin-toggle sidenote-number"></label><span class="sidenote"> At least until I get around to merging the theme and the org repository so that the org file can be tangled in order to generate the theme files. </span>, <a href="https://github.com/tactical-documentation/tactical-documentation.github.io">one of them</a> housing the files for this
+statically linked site, <a href="https://github.com/tactical-documentation/hugo-tacdoc-theme">another one</a> containing the theme for this
+site and the <a href="https://github.com/tactical-documentation/org">third one</a> containing the org source of this site. I
+use <a href="https://www.gnu.org/software/emacs/">emacs</a> to write this content using the amazing <a href="https://orgmode.org/">org</a> file format,
+<a href="https://github.com/kaushalmodi/ox-hugo">ox-hugo</a> to export the content into whatever file structure <a href="https://gohugo.io">hugo</a>
+uses to generate this statically linked site.</p>
+
+<h3 id="disclaimer">Disclaimer</h3>
+
+<p>As far as I understand there might be a few things that I am
+obliged to mention, so here they are:</p>
+
+<ul>
+<li>I do not assume any kind of responsibility for anything you do,
+think, understand or feel before, after or during the time you
+read any of this content. I just want a place to write stuff
+down and I sincerly hope all people, who get to read it just
+have a nice time reading it or benefit from what I write down.</li>
+<li>Most of the content I will put on this site is probably going
+to be fairly technical, you should not under any circumstaces
+try any of it out if you don&rsquo;t know exactly what you are
+doing. Even then you should always check if the information you
+read is correct or applicable to your personal case. I really
+hope that whatever I write down might help you solve a problem
+or that you just have a great time reading it, but just in case
+you should always try to check if what you read is actually
+correct.</li>
+<li>As the times, when the internet didn&rsquo;t forget anything seem to
+have passed, there is another topic I might have to mention: I
+link to other sources and I am not responsible for whatever
+happens when you click on those links or where-ever these links
+might or might not lead, because a site has been remodeled,
+moved, died or been replaced by another one or anything
+else. You shall not hold me accountable to anything, when you
+click on a link on this site. I will try to kepp dead links up
+to date, but it really is not a priority or something that I do
+actively. Also since this is a very simple static page,there is
+no intermediate warning page that makes you aware of the fact
+that you are about to leave this site. If leaving this site
+using a link is something that concerns you, don&rsquo;t follow any
+links on this site.</li>
+</ul>
+
+<h3 id="privacy">Privacy</h3>
+
+<p>I do not collect any of your private data. I&rsquo;m solely a user of
+the github pages service, where this site is hosted. In case you
+have any concerns you might have as to how your private data is
+collected, stored or used, you should get in touch with github
+(whose very detailed privacy statement is at the time I&rsquo;m writing
+this available <a href="https://help.github.com/en/articles/github-privacy-statement">here</a>).</p>
+
+<h3 id="where-is-this-blog-hosted">Where is this blog hosted?</h3>
+
+<p>It is hosted on github pages, they have a privacy statement,
+which at the time I&rsquo;m writing this resides <a href="https://help.github.com/en/articles/github-privacy-statement">here</a> and where you can
+in detail read about everything they do with data. This site will
+not use any external services besides github pages, there is no
+commenting system and no analytics script running. This is just a
+simple static site with information on it.</p>
+
+<h3 id="what-services-are-used-when-this-site-is-accessed">What services are used when this site is accessed?</h3>
+
+<p>I guess this part might be fairly interesting to some people, so
+here it is:</p>
+
+<p>The site does not use any external services, there are no ads or
+cookies. You can look at the source of the hugo theme <a href="https://github.com/tactical-documentation/hugo-tacdoc-theme">here</a> and at
+the source of this site <a href="https://github.com/tactical-documentation/tactical-documentation.github.io">here</a>. A bit of CSS is used for styling,
+you can take a look at it at the theme repository.</p>
+
+<p>For the most part, no Javascript is used on this site, with the
+sole exception currently being <a href="https://www.mathjax.org/">Mathjax</a>, which is used to display
+rendered version of <a href="https://www.latex-project.org/">LaTeX</a> code on some of the posts
+<label class="margin-toggle sidenote-number"></label><span class="sidenote"> this one included, due to the little theme showcase below </span>. The Mathjax files used in this blog are not hosted by
+an external CDN, instead they are also hosted with the rest of
+the static files and reside in the repository of this site.</p>
+
+<p>Additional Javascript may be added at a later point of time,
+however I&rsquo;ll only add Javascript in order to enable missing
+functionality, such as Mathjax for the purpose of rendering LaTeX
+formulas. If I do so I&rsquo;ll add the necessary files to the source
+repo as well as to avoid generating any external
+connections. I&rsquo;ll also try to remember to append such information
+to this page.</p>
+
+<p>If you want to access the content of this site, without a browser
+or in text form, you can always just grab a copy of the
+repository containing the org source of the content and read it
+in your favourite pager or text editor or just try to rebuild the
+site locally and view it served from your own machine (see the
+next section for pointers on how to do so).</p>
+
+<h3 id="how-i-build-this-site">How I build this site?</h3>
+
+<p>First we have to create a new Hugo project, we can follow the
+getting started part of their documentation for this.</p>
+
+<p>Once the project has been created, we can add our theme in the
+theme directory, make sure the <code>config.toml</code> <label class="margin-toggle sidenote-number"></label><span class="sidenote"> I am actually keeping my config.toml in my org repo, together with the rest of the content, so keeping any additional repository containing files that hugo has generated would be pretty pointless as really only the public/ part of this repository is worth keeping. </span> is actually using it and run <code>hugo</code> from within the
+project folder to create the <code>public/</code> directory.</p>
+
+<p>When it comes to the theme, we might want to update the version
+of mathjax it is using and we might want to make sure the
+mathjax-fonts are available inside the <code>static/fonts/</code> directory of
+the theme, although the missing fonts error I encountered when
+building this locally is something that went away after a rebuild
+and without having to supply the fonts, so this part might not be
+necessary.</p>
+
+<p>When that&rsquo;s done, we can focus on the content: open up the org
+file in emacs, add some content and <code>C-c C-e H A</code>, then head over
+to the hugo project, run <code>hugo</code> and check if it looks as expected.</p>
+
+<h2 id="theme-preview">Theme Preview</h2>
+
+<script type="text/x-mathjax-config">
+ MathJax.Hub.Config({
+     messageStyle: "none",
+     displayAlign: "center",
+     displayIndent: "0em",
+     "HTML-CSS": { scale: 100,
+                   linebreaks: { automatic: "false" },
+                   webFont: "TeX"
+     },
+     SVG: {scale: 100,
+           linebreaks: { automatic: "false" },
+           font: "TeX"},
+     NativeMML: {scale: 100},
+     TeX: { equationNumbers: {autoNumber: "AMS"},
+            MultLineWidth: "85%",
+            TagSide: "right",
+            TagIndent: ".8em"
+     }
+ });
+</script>
+<script src="/js/MathJax/MathJax.js?config=TeX-AMS_HTML"></script>
+
+
+<p>This part of the page is a bit of a showcase for the theme used in
+this blog, I&rsquo;ve pretty much cargo-culted it from various sources,
+including the following hugo themes:</p>
+
+<ul>
+<li><a href="https://github.com/davidhampgonsalves/hugo-black-and-light-theme">black-and-light</a></li>
+<li><a href="https://github.com/alanorth/hugo-theme-tufte-css">hugo-theme-tufte-css</a></li>
+<li><a href="https://github.com/bobfp/hugo-slick">slick</a></li>
+</ul>
+
+<p>A few interesting things from the org file of the ox-hugo page:</p>
+
+<p>Testing a sidenote<label class="margin-toggle sidenote-number"></label><span class="sidenote"> This text should appear at the side of the text </span> inside a block of text, which contains another
+sidenote<label class="margin-toggle sidenote-number"></label><span class="sidenote"> which is probably also displayed at the side of the page </span>.</p>
+
+<p>There are also margin notes<label class="margin-toggle sidenote-number"></label><span class="marginnote"> Note how this shouldn&rsquo;t be numbered. </span>.</p>
+
+<p>So here is an example block:</p>
+<div class="highlight"><pre style="background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-text" data-lang="text">#+setupfile: doc-setupfile.org
+
+#+macro: imageclick [[file:./static/images/$1][file:/images/$1]]
+#+macro: doc [[/doc/$1/$2][$3]]</code></pre></div>
+<p>Also how do quotes look like?</p>
+
+<blockquote>
+<p>These things happened. They were glorious and they changed the
+world&hellip; and then we fucked up the end game.</p>
+
+<ul>
+<li>C.W.</li>
+</ul>
+</blockquote>
+
+<p>How about Footnotes&nbsp;<sup class="footnote-ref" id="fnref:fn-1"><a href="#fn:fn-1">1</a></sup>?</p>
+
+<p>Images:</p>
+
+<figure>
+    <img src="/ox-hugo/htop.png"
+         alt="Figure 1: This is an image."/> <figcaption>
+            <p>Figure 1: This is an image.</p>
+        </figcaption>
+</figure>
+
+
+<p>Lists:</p>
+
+<ul>
+<li>item</li>
+<li>another item
+
+<ul>
+<li>item</li>
+<li>bla</li>
+</ul></li>
+<li>bla</li>
+</ul>
+
+<p>Tables:</p>
+
+<div class="table-caption">
+  <span class="table-number">Table 1</span>:
+  This is a caption
+</div>
+
+<table>
+<thead>
+<tr>
+<th>This</th>
+<th>is</th>
+<th>a</th>
+<th>Table</th>
+</tr>
+</thead>
+
+<tbody>
+<tr>
+<td>1</td>
+<td>2</td>
+<td>3</td>
+<td>4</td>
+</tr>
+
+<tr>
+<td>5</td>
+<td>6</td>
+<td>7</td>
+<td>8</td>
+</tr>
+</tbody>
+</table>
+
+<p>Task Lists</p>
+
+<ul class="task-list">
+<li><label><input type="checkbox" disabled class="task-list-item"> task</label></li>
+<li><label><input type="checkbox" checked disabled class="task-list-item"> task</label></li>
+<li><label><input type="checkbox" disabled class="task-list-item"> task</label></li>
+<li><label><input type="checkbox" checked disabled class="task-list-item"> task</label></li>
+<li><label><input type="checkbox" disabled class="task-list-item"> task</label></li>
+</ul>
+
+<p>Formulas using Mathjax \(\log_{ab}^{x} = x * \frac{2}{5}\)</p>
+
+<p>Next lets look at source code blocks:</p>
+
+<p>Python:</p>
+<div class="highlight"><pre style="background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-python" data-lang="python"><span style="color:#069;font-weight:bold">for</span> i <span style="color:#000;font-weight:bold">in</span> bla:
+  <span style="color:#069;font-weight:bold">print</span> i;</code></pre></div>
+<p>Bourne shell:</p>
+<div class="highlight"><pre style="background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-sh" data-lang="sh"><span style="color:#069;font-weight:bold">for</span> i in <span style="color:#069;font-weight:bold">$(</span>ls ~/some/path | grep foo<span style="color:#069;font-weight:bold">)</span>
+<span style="color:#069;font-weight:bold">do</span>
+  <span style="color:#366">echo</span> -e <span style="color:#c30">&#34;\n Here is some output : </span><span style="color:#033">$i</span><span style="color:#c30">&#34;</span>
+<span style="color:#069;font-weight:bold">done</span></code></pre></div>
+<p>Bash:</p>
+<div class="highlight"><pre style="background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-bash" data-lang="bash"><span style="color:#069;font-weight:bold">for</span> i in <span style="color:#069;font-weight:bold">$(</span>ls ~/some/path | grep foo<span style="color:#069;font-weight:bold">)</span>
+<span style="color:#069;font-weight:bold">do</span>
+  <span style="color:#366">echo</span> -e <span style="color:#c30">&#34;\n Here is some output : </span><span style="color:#033">$i</span><span style="color:#c30">&#34;</span>
+<span style="color:#069;font-weight:bold">done</span></code></pre></div>
+<p>HTML:</p>
+<div class="highlight"><pre style="background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-html" data-lang="html">&lt;<span style="color:#309;font-weight:bold">head</span>&gt; Bla &lt;/<span style="color:#309;font-weight:bold">head</span>&gt;
+&lt;<span style="color:#309;font-weight:bold">body</span>&gt; Bleh &lt;/<span style="color:#309;font-weight:bold">body</span>&gt;</code></pre></div>
+<p>C++:</p>
+<div class="highlight"><pre style="background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-c++" data-lang="c++"><span style="color:#099">#import &lt;std.h&gt;
+</span><span style="color:#099"></span>
+<span style="color:#078;font-weight:bold">void</span> <span style="color:#c0f">main</span> () {
+  sdt<span style="color:#555">::</span>cout <span style="color:#555">&lt;&lt;</span> <span style="color:#c30">&#34;bla&#34;</span> <span style="color:#555">&lt;&lt;</span> var <span style="color:#555">&lt;&lt;</span> std<span style="color:#555">::</span>endl;
+}
+</code></pre></div>
+<p>emacs-lisp:</p>
+<div class="highlight"><pre style="background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-emacs-lisp" data-lang="emacs-lisp">(<span style="color:#366">defun</span> <span style="color:#033">a-function</span> (<span style="color:#033">a-list</span>)
+    <span style="color:#c30">&#34;This makes no sense&#34;</span>
+  (<span style="color:#366">interactive</span>)
+  (<span style="color:#366">dolist</span> (<span style="color:#033">item</span> <span style="color:#033">a-list</span>)
+    (<span style="color:#c0f">print</span> <span style="color:#033">item</span>)))</code></pre></div><div class="footnotes">
+
+<hr />
+
+<ol>
+<li id="fn:fn-1">This is a footnote
+ <a class="footnote-return" href="#fnref:fn-1"><sup>[return]</sup></a></li>
+</ol>
+</div>
+
+  </div>
+
+  <div id=links>
+    
+      <a class="basic-alignment left" href="https://tactical-documentation.github.io/src/">&laquo; src</a>
+    
+    
+  </div>
+</section>
+
+</body>
+</html>
+
+
+

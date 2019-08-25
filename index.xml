@@ -1,0 +1,372 @@
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+	<channel>
+		<title>tactical-documentation</title>
+		<link>https://tactical-documentation.github.io/</link>
+		<description>Recent content on tactical-documentation</description>
+		<generator>Hugo 0.57.2 -- gohugo.io</generator>
+		<language>en-us</language>
+		<lastBuildDate>Sun, 25 Aug 2019 01:01:35 +0000</lastBuildDate>
+		<atom:link href="https://tactical-documentation.github.io/index.xml" rel="self" type="application/rss+xml" />
+			
+			
+			<item>
+				<title>Proxmox VE 6 Setup: ZFS, LUKS, systemd-boot and Dropbear</title>
+				<link>https://tactical-documentation.github.io/post/proxmoxve6-zfs-luks-systemdboot-dropbear/</link>
+				<pubDate>Fri, 23 Aug 2019 00:00:00 +0000</pubDate>
+				<guid>https://tactical-documentation.github.io/post/proxmoxve6-zfs-luks-systemdboot-dropbear/</guid>
+				<description>
+
+&lt;p&gt;This describes how to set up a fully encrypted Proxmox VE 6 host
+with ZFS root and unlocking it remotely using the dropbear ssh
+server. Also it describes how you can do that, while keeping
+systemd-boot and thus also the pve tooling intact&lt;label class=&#34;margin-toggle sidenote-number&#34;&gt;&lt;/label&gt;&lt;span class=&#34;sidenote&#34;&gt; I&amp;rsquo;m not sure if the pve tooling still works if you replace systemd-boot with grub, which seems to be the common solution to setting up this kind of setup,maybe it does &lt;/span&gt;.&lt;/p&gt;
+
+&lt;h2 id=&#34;overview&#34;&gt;Overview&lt;/h2&gt;
+
+&lt;p&gt;We are going to do the following:&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;Install Proxmox VE 6 on our machine&lt;/li&gt;
+&lt;li&gt;Minimally configure the Installation&lt;/li&gt;
+&lt;li&gt;Encrypt the Installation:
+
+&lt;ol&gt;
+&lt;li&gt;Remove a Disk from the ZFS-Pool&lt;/li&gt;
+&lt;li&gt;Encrypt the Disk with LUKS&lt;/li&gt;
+&lt;li&gt;Add it back to the ZFS Pool&lt;/li&gt;
+&lt;li&gt;Repeat until all disks are encrypted&lt;/li&gt;
+&lt;/ol&gt;&lt;/li&gt;
+&lt;li&gt;Set up Dropbear and Systemd-boot to enable remote unlocking&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;h2 id=&#34;prerequisites&#34;&gt;Prerequisites&lt;/h2&gt;
+
+&lt;p&gt;There really only is one prerequisite apart from having a machine
+you want to install Proxmox onto: You need a second harddrive,
+which we will setup in a ZFS RAID1 configuration. If you don&amp;rsquo;t
+want to have your root devices mirrored, you will still need a
+second drive that you can use as a temporary mirrored root device,
+otherwise you&amp;rsquo;d have to install and set up an encrypted debian and
+then install proxmox on top of that.&lt;/p&gt;
+
+&lt;p&gt;Apart from that I&amp;rsquo;ll assume that you are probably fairly familiar
+with how full disk encryption works on linux systems, if not you
+might want to read up on that before you start messing around with
+any hardware. Please don&amp;rsquo;t try this out on a production system,
+if you don&amp;rsquo;t exactly know what you&amp;rsquo;re doing.&lt;/p&gt;
+
+&lt;h2 id=&#34;installing-proxmox-ve-6&#34;&gt;Installing Proxmox VE 6&lt;/h2&gt;
+
+&lt;p&gt;The only thing you have to make sure is to set up the ZFS RAID 1
+during the installation. The rest should be pretty much
+straight-forward.&lt;/p&gt;
+
+&lt;h2 id=&#34;minimal-post-installation&#34;&gt;Minimal post-installation&lt;/h2&gt;
+
+&lt;p&gt;For some odd reason &lt;code&gt;PATH&lt;/code&gt; in a regular shell is different from &lt;code&gt;PATH&lt;/code&gt;
+in the javascript terminal from the webinterface. You might want
+to take care of that:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span style=&#34;color:#366&#34;&gt;export&lt;/span&gt; &lt;span style=&#34;color:#033&#34;&gt;PATH&lt;/span&gt;&lt;span style=&#34;color:#555&#34;&gt;=&lt;/span&gt;/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;Remove the subscription popup notice (&lt;a href=&#34;https://johnscs.com/remove-proxmox51-subscription-notice/&#34;&gt;source&lt;/a&gt;):&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;sed -i.bak &lt;span style=&#34;color:#c30&#34;&gt;&amp;#34;s/data.status !== &amp;#39;Active&amp;#39;/false/g&amp;#34;&lt;/span&gt; /usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js &lt;span style=&#34;color:#555&#34;&gt;&amp;amp;&amp;amp;&lt;/span&gt; systemctl restart pveproxy.service&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;Set up the community repositories:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;rm /etc/apt/sources.list.d/pve-enterprise.list
+&lt;span style=&#34;color:#366&#34;&gt;echo&lt;/span&gt; &lt;span style=&#34;color:#c30&#34;&gt;&amp;#39;deb http://download.proxmox.com/debian/pve buster pve-no-subscription&amp;#39;&lt;/span&gt; &amp;gt; pve-community.list&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;Update the host:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;apt update
+apt upgrade&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;h2 id=&#34;encrypt-your-installation&#34;&gt;Encrypt your installation&lt;/h2&gt;
+
+&lt;p&gt;This is partly taken over from &lt;a href=&#34;https://forums.servethehome.com/index.php?threads/proxmox-zfs-encryption-guide-work-in-progress.23004/#post-215138&#34;&gt;this wonderful post&lt;/a&gt;&lt;label class=&#34;margin-toggle sidenote-number&#34;&gt;&lt;/label&gt;&lt;span class=&#34;sidenote&#34;&gt; The GRUB_ENABLE_CRYPTODISK option that is mentioned in the &lt;a href=&#34;https://forums.servethehome.com/index.php?threads/proxmox-zfs-encryption-guide-work-in-progress.23004/#post-215138&#34;&gt;forum post&lt;/a&gt; does not apply here, since the boot partition is not encrypted. If you want this level of security, then this is probably not the right guide for you. Also from my understanding encrypting the boot partition means that you can&amp;rsquo;t use dropbear to unlock the system remotely since nothing has booted so far. It is a pretty nice way to set up fully encrypted laptops though, so you should definitely look into this if you haven&amp;rsquo;t already! &lt;/span&gt;.&lt;/p&gt;
+
+&lt;p&gt;Right after the installation the host should look similiar to this
+(&lt;code&gt;lsblk&lt;/code&gt;):&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;NAME            MAJ:MIN RM   SIZE RO TYPE  MOUNTPOINT
+sda               8:0    0 465.8G  0 disk
+├─sda1            8:1    0  1007K  0 part
+├─sda2            8:2    0   512M  0 part
+└─sda3            8:3    0 465.3G  0 part
+sdb               8:16   0 931.5G  0 disk
+sdc               8:32   0 931.5G  0 disk
+sdd               8:48   0 465.8G  0 disk
+├─sdd1            8:49   0  1007K  0 part
+├─sdd2            8:50   0   512M  0 part
+└─sdd3            8:51   0 465.3G  0 part&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;The third partition of both harddrives contains our installation,
+the first and second are the boot and efi partitions.&lt;/p&gt;
+
+&lt;p&gt;&lt;code&gt;zpool status&lt;/code&gt; should return something like this:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;NAME             STATE     READ WRITE CKSUM
+rpool            ONLINE       0     0     0
+  mirror-0       ONLINE       0     0     0
+    ata-Samsung_SSD_850_EVO_500GB_XXXXXXXXXXXXXXX-part3  ONLINE       0     0     0
+    ata-WDC_WDS500G2B0A-XXXXXX_XXXXXXXXXXXX-part3        ONLINE       0     0     0&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;You might want to install &lt;code&gt;cryptsetup&lt;/code&gt; at this point:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;apt install cryptsetup&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;Remove the first partition from &lt;code&gt;rpool&lt;/code&gt;, then encrypt it, mount it
+to &lt;code&gt;/dev/mapper/cryptrpool1&lt;/code&gt; and reattach it to &lt;code&gt;rpool&lt;/code&gt;:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;zpool detach rpool ata-Samsung_SSD_850_EVO_500GB_XXXXXXXXXXXXXXX-part3
+cryptsetup luksFormat /dev/disk/by-id/ata-Samsung_SSD_850_EVO_500GB_XXXXXXXXXXXXXXX-part3
+cryptsetup luksOpen /dev/disk/by-id/ata-Samsung_SSD_850_EVO_500GB_XXXXXXXXXXXXXXX-part3 cryptrpool1
+zpool attach rpool ata-Samsung_SSD_850_EVO_500GB_XXXXXXXXXXXXXXX-part3 cryptrpool1&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;Wait until the &lt;code&gt;scan&lt;/code&gt; line of &lt;code&gt;zpool status&lt;/code&gt; displays that the drive
+has been resilvered successfully. You should see something
+similiar to this:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;scan: resilvered 1022M in 0 days 00:00:04 with 0 errors on Wed Aug 21 17:27:55 2019&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;Now repeat this step with the other drive:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;zpool detach rpool ata-WDC_WDS500G2B0A-XXXXXX_XXXXXXXXXXXX-part3
+cryptsetup luksFormat /dev/disk/by-id/ata-WDC_WDS500G2B0A-XXXXXX_XXXXXXXXXXXX-part3
+cryptsetup luksOpen /dev/disk/by-id/ata-WDC_WDS500G2B0A-XXXXXX_XXXXXXXXXXXX-part3 cryptrpool2
+zpool attach rpool cryptrpool1 cryptrpool2&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;At this point &lt;code&gt;lsblk&lt;/code&gt; should output something like this:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;NAME            MAJ:MIN RM   SIZE RO TYPE  MOUNTPOINT
+sda               8:0    0 465.8G  0 disk
+├─sda1            8:1    0  1007K  0 part
+├─sda2            8:2    0   512M  0 part
+└─sda3            8:3    0 465.3G  0 part
+  └─cryptrpool1 253:0    0 465.3G  0 crypt
+sdb               8:16   0 931.5G  0 disk
+sdc               8:32   0 931.5G  0 disk
+sdd               8:48   0 465.8G  0 disk
+├─sdd1            8:49   0  1007K  0 part
+├─sdd2            8:50   0   512M  0 part
+└─sdd3            8:51   0 465.3G  0 part
+  └─cryptrpool2 253:1    0 465.3G  0 crypt&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;And &lt;code&gt;zpool status&lt;/code&gt; should return something like this:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;NAME             STATE     READ WRITE CKSUM
+rpool            ONLINE       0     0     0
+  mirror-0       ONLINE       0     0     0
+    cryptrpool1  ONLINE       0     0     0
+    cryptrpool2  ONLINE       0     0     0&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;Next we want to set up &lt;code&gt;/etc/crypttab&lt;/code&gt;, use &lt;code&gt;blkid&lt;/code&gt; to get the
+&lt;code&gt;PARTUUID&lt;/code&gt; from both harddrives:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;blkid -s PARTUUID -o value /dev/disk/by-id/ata-Samsung_SSD_850_EVO_500GB_XXXXXXXXXXXXXXX-part3
+blkid -s PARTUUID -o value /dev/disk/by-id/ata-WDC_WDS500G2B0A-XXXXXX_XXXXXXXXXXXX-part3&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;Then add them to &lt;code&gt;/etc/crypttab&lt;/code&gt; &lt;label class=&#34;margin-toggle sidenote-number&#34;&gt;&lt;/label&gt;&lt;span class=&#34;sidenote&#34;&gt; &lt;code&gt;caliban&lt;/code&gt; is the name of my proxmox host. &lt;/span&gt;:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;root@caliban:~# cat /etc/crypttab
+# &amp;lt;target name&amp;gt; &amp;lt;source device&amp;gt;                                &amp;lt;key file&amp;gt;      &amp;lt;options&amp;gt;
+  cryptrpool1   PARTUUID=XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX  none            luks,discard,initramfs
+  cryptrpool2   PARTUUID=YYYYYYYY-YYYY-YYYY-YYYY-YYYYYYYYYYYY  none            luks,discard,initramfs&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;Then update the initramfs and make sure it is put on the boot
+partition (this is where we deviate from the forum post I&amp;rsquo;ve linked
+above):&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;update-initramfs -u -k all
+pve-efiboot-tool refresh&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;In case you&amp;rsquo;re wondering at this point, yes I&amp;rsquo;m also getting the
+&lt;code&gt;cryptsetup&lt;/code&gt; error message on running &lt;code&gt;update-initramfs&lt;/code&gt;, it still works
+though:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;cryptsetup: ERROR: Couldn&amp;#39;t resolve device rpool/ROOT/pve-1
+cryptsetup: WARNING: Couldn&amp;#39;t determine root device&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;Now you should be able to reboot and unlock the ZFS partitions by
+entering the passphrase.&lt;/p&gt;
+
+&lt;h2 id=&#34;setting-up-dropbear-to-remotely-unlock-the-partition&#34;&gt;Setting up Dropbear to remotely unlock the partition&lt;/h2&gt;
+
+&lt;p&gt;Now to the fun part! Since we aren&amp;rsquo;t using &lt;code&gt;grub&lt;/code&gt; here, we have to take
+a few different steps from what we usually do in this kind of
+setup.&lt;/p&gt;
+
+&lt;p&gt;Here are a few interesting links you might want to look into as well:&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;&lt;a href=&#34;https://www.pbworks.net/ubuntu-guide-dropbear-ssh-server-to-unlock-luks-encrypted-pc/&#34;&gt;This&lt;/a&gt; nicely explains how to use the keys Dropbear already generates on
+install instead of recreating them.&lt;/li&gt;
+&lt;li&gt;The freedesktop page on &lt;a href=&#34;https://www.freedesktop.org/wiki/Software/systemd/systemd-boot/&#34;&gt;systemd-boot&lt;/a&gt;&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;https://adfinis-sygroup.ch/en/blog/decrypt-luks-devices-remotely-via-dropbear-ssh/&#34;&gt;This little article&lt;/a&gt; on setting up &lt;code&gt;archlinux&lt;/code&gt; with &lt;code&gt;dropbear&lt;/code&gt; does
+not fully apply to our Proxmox case, but it gives enough
+information on how we can tell &lt;code&gt;systemd-boot&lt;/code&gt; to tell the kernel
+to start with the options we want&lt;label class=&#34;margin-toggle sidenote-number&#34;&gt;&lt;/label&gt;&lt;span class=&#34;sidenote&#34;&gt; unlike the article states, we need to use the udev name for assigning the IP and I was getting error messages, when supplying nameserver IPs &lt;/span&gt;.&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;First install &lt;code&gt;dropbear&lt;/code&gt; and &lt;code&gt;busybox&lt;/code&gt;:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;apt install dropbear busybox&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;In &lt;code&gt;/etc/initramfs-tools/initramfs.conf&lt;/code&gt; enable busybox:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;root@caliban:~# cat /etc/initramfs-tools/initramfs.conf | grep ^BUSYBOX
+BUSYBOX=y&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;Then convert the dropbear keys:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span style=&#34;color:#366&#34;&gt;cd&lt;/span&gt; /etc/dropbear-initramfs/
+/usr/lib/dropbear/dropbearconvert dropbear openssh dropbear_rsa_host_key id_rsa
+dropbearkey -y -f dropbear_rsa_host_key | grep &lt;span style=&#34;color:#c30&#34;&gt;&amp;#34;^ssh-rsa &amp;#34;&lt;/span&gt; &amp;gt; id_rsa.pub&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;And add your public key to the authorized keys:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;vi /etc/dropbear-initramfs/authorized_keys&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;Make sure &lt;code&gt;dropbear&lt;/code&gt; starts by toggling the &lt;code&gt;NO_START&lt;/code&gt; value in
+&lt;code&gt;/etc/default/dropbear&lt;/code&gt;.&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;root@caliban:~# cat /etc/default/dropbear | grep ^NO_START
+NO_START=0&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;Finally configure &lt;code&gt;dropbear&lt;/code&gt; to use a different Port than 22 in order to
+avoid getting the MITM warning, by changing the &lt;code&gt;DROPBEAR_OPTIONS&lt;/code&gt; value
+in /etc/dropbear-initramfs/config:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;root@caliban:~# cat /etc/dropbear-initramfs/config | grep ^DROPBEAR_OPTIONS
+DROPBEAR_OPTIONS=&amp;#34;-p 12345&amp;#34;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;You can then set up two entries in your &lt;code&gt;~/.ssh/config&lt;/code&gt;:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;$ cat ~/.ssh/config
+Host *
+ServerAliveInterval 120
+
+Host unlock_caliban
+  Hostname 1.2.3.4
+  User root
+  Port 2222
+
+Host caliban
+  Hostname 1.2.3.4
+  Port 22&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;At this point I noticed, that only the third partition of both of the
+harddrives with the rpool were mounted. When mounting a boot
+partition, I found that there were systemd-boot configuration files,
+but they seemed to be autogenerated by Proxmox, whenever
+&lt;code&gt;pve-efiboot-tool refresh&lt;/code&gt; was run. So I looked into
+&lt;code&gt;/usr/sbin/pve-efiboot-tool&lt;/code&gt;, and followed the code until I came out in
+&lt;code&gt;/etc/kernel/postinst.d/zz-pve-efiboot&lt;/code&gt;, which contains the code that
+generates the systemd-boot configuration files:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span style=&#34;color:#09f;font-style:italic&#34;&gt;# [...]&lt;/span&gt;
+&lt;span style=&#34;color:#069;font-weight:bold&#34;&gt;for&lt;/span&gt; kver in &lt;span style=&#34;color:#a00&#34;&gt;${&lt;/span&gt;&lt;span style=&#34;color:#033&#34;&gt;BOOT_KVERS&lt;/span&gt;&lt;span style=&#34;color:#a00&#34;&gt;}&lt;/span&gt;; &lt;span style=&#34;color:#069;font-weight:bold&#34;&gt;do&lt;/span&gt;
+
+    &lt;span style=&#34;color:#033&#34;&gt;linux_image&lt;/span&gt;&lt;span style=&#34;color:#555&#34;&gt;=&lt;/span&gt;&lt;span style=&#34;color:#c30&#34;&gt;&amp;#34;/boot/vmlinuz-&lt;/span&gt;&lt;span style=&#34;color:#a00&#34;&gt;${&lt;/span&gt;&lt;span style=&#34;color:#033&#34;&gt;kver&lt;/span&gt;&lt;span style=&#34;color:#a00&#34;&gt;}&lt;/span&gt;&lt;span style=&#34;color:#c30&#34;&gt;&amp;#34;&lt;/span&gt;
+    &lt;span style=&#34;color:#033&#34;&gt;initrd&lt;/span&gt;&lt;span style=&#34;color:#555&#34;&gt;=&lt;/span&gt;&lt;span style=&#34;color:#c30&#34;&gt;&amp;#34;/boot/initrd.img-&lt;/span&gt;&lt;span style=&#34;color:#a00&#34;&gt;${&lt;/span&gt;&lt;span style=&#34;color:#033&#34;&gt;kver&lt;/span&gt;&lt;span style=&#34;color:#a00&#34;&gt;}&lt;/span&gt;&lt;span style=&#34;color:#c30&#34;&gt;&amp;#34;&lt;/span&gt;
+
+    &lt;span style=&#34;color:#069;font-weight:bold&#34;&gt;if&lt;/span&gt; &lt;span style=&#34;color:#555&#34;&gt;[&lt;/span&gt; ! -f &lt;span style=&#34;color:#c30&#34;&gt;&amp;#34;&lt;/span&gt;&lt;span style=&#34;color:#a00&#34;&gt;${&lt;/span&gt;&lt;span style=&#34;color:#033&#34;&gt;linux_image&lt;/span&gt;&lt;span style=&#34;color:#a00&#34;&gt;}&lt;/span&gt;&lt;span style=&#34;color:#c30&#34;&gt;&amp;#34;&lt;/span&gt; &lt;span style=&#34;color:#555&#34;&gt;]&lt;/span&gt;; &lt;span style=&#34;color:#069;font-weight:bold&#34;&gt;then&lt;/span&gt;
+        warn &lt;span style=&#34;color:#c30&#34;&gt;&amp;#34;No linux-image &lt;/span&gt;&lt;span style=&#34;color:#a00&#34;&gt;${&lt;/span&gt;&lt;span style=&#34;color:#033&#34;&gt;linux_image&lt;/span&gt;&lt;span style=&#34;color:#a00&#34;&gt;}&lt;/span&gt;&lt;span style=&#34;color:#c30&#34;&gt; found - skipping&amp;#34;&lt;/span&gt;
+        &lt;span style=&#34;color:#069;font-weight:bold&#34;&gt;continue&lt;/span&gt;
+    &lt;span style=&#34;color:#069;font-weight:bold&#34;&gt;fi&lt;/span&gt;
+    &lt;span style=&#34;color:#069;font-weight:bold&#34;&gt;if&lt;/span&gt; &lt;span style=&#34;color:#555&#34;&gt;[&lt;/span&gt; ! -f &lt;span style=&#34;color:#c30&#34;&gt;&amp;#34;&lt;/span&gt;&lt;span style=&#34;color:#a00&#34;&gt;${&lt;/span&gt;&lt;span style=&#34;color:#033&#34;&gt;initrd&lt;/span&gt;&lt;span style=&#34;color:#a00&#34;&gt;}&lt;/span&gt;&lt;span style=&#34;color:#c30&#34;&gt;&amp;#34;&lt;/span&gt; &lt;span style=&#34;color:#555&#34;&gt;]&lt;/span&gt;; &lt;span style=&#34;color:#069;font-weight:bold&#34;&gt;then&lt;/span&gt;
+        warn &lt;span style=&#34;color:#c30&#34;&gt;&amp;#34;No initrd-image &lt;/span&gt;&lt;span style=&#34;color:#a00&#34;&gt;${&lt;/span&gt;&lt;span style=&#34;color:#033&#34;&gt;initrd&lt;/span&gt;&lt;span style=&#34;color:#a00&#34;&gt;}&lt;/span&gt;&lt;span style=&#34;color:#c30&#34;&gt; found - skipping&amp;#34;&lt;/span&gt;
+        &lt;span style=&#34;color:#069;font-weight:bold&#34;&gt;continue&lt;/span&gt;
+    &lt;span style=&#34;color:#069;font-weight:bold&#34;&gt;fi&lt;/span&gt;
+
+    warn &lt;span style=&#34;color:#c30&#34;&gt;&amp;#34;  Copying kernel and creating boot-entry for &lt;/span&gt;&lt;span style=&#34;color:#a00&#34;&gt;${&lt;/span&gt;&lt;span style=&#34;color:#033&#34;&gt;kver&lt;/span&gt;&lt;span style=&#34;color:#a00&#34;&gt;}&lt;/span&gt;&lt;span style=&#34;color:#c30&#34;&gt;&amp;#34;&lt;/span&gt;
+    &lt;span style=&#34;color:#033&#34;&gt;KERNEL_ESP_DIR&lt;/span&gt;&lt;span style=&#34;color:#555&#34;&gt;=&lt;/span&gt;&lt;span style=&#34;color:#c30&#34;&gt;&amp;#34;&lt;/span&gt;&lt;span style=&#34;color:#a00&#34;&gt;${&lt;/span&gt;&lt;span style=&#34;color:#033&#34;&gt;PMX_ESP_DIR&lt;/span&gt;&lt;span style=&#34;color:#a00&#34;&gt;}&lt;/span&gt;&lt;span style=&#34;color:#c30&#34;&gt;/&lt;/span&gt;&lt;span style=&#34;color:#a00&#34;&gt;${&lt;/span&gt;&lt;span style=&#34;color:#033&#34;&gt;kver&lt;/span&gt;&lt;span style=&#34;color:#a00&#34;&gt;}&lt;/span&gt;&lt;span style=&#34;color:#c30&#34;&gt;&amp;#34;&lt;/span&gt;
+    &lt;span style=&#34;color:#033&#34;&gt;KERNEL_LIVE_DIR&lt;/span&gt;&lt;span style=&#34;color:#555&#34;&gt;=&lt;/span&gt;&lt;span style=&#34;color:#c30&#34;&gt;&amp;#34;&lt;/span&gt;&lt;span style=&#34;color:#a00&#34;&gt;${&lt;/span&gt;&lt;span style=&#34;color:#033&#34;&gt;esp&lt;/span&gt;&lt;span style=&#34;color:#a00&#34;&gt;}&lt;/span&gt;&lt;span style=&#34;color:#c30&#34;&gt;/&lt;/span&gt;&lt;span style=&#34;color:#a00&#34;&gt;${&lt;/span&gt;&lt;span style=&#34;color:#033&#34;&gt;KERNEL_ESP_DIR&lt;/span&gt;&lt;span style=&#34;color:#a00&#34;&gt;}&lt;/span&gt;&lt;span style=&#34;color:#c30&#34;&gt;&amp;#34;&lt;/span&gt;
+    mkdir -p &lt;span style=&#34;color:#c30&#34;&gt;&amp;#34;&lt;/span&gt;&lt;span style=&#34;color:#a00&#34;&gt;${&lt;/span&gt;&lt;span style=&#34;color:#033&#34;&gt;KERNEL_LIVE_DIR&lt;/span&gt;&lt;span style=&#34;color:#a00&#34;&gt;}&lt;/span&gt;&lt;span style=&#34;color:#c30&#34;&gt;&amp;#34;&lt;/span&gt;
+    cp -u --preserve&lt;span style=&#34;color:#555&#34;&gt;=&lt;/span&gt;timestamps &lt;span style=&#34;color:#c30&#34;&gt;&amp;#34;&lt;/span&gt;&lt;span style=&#34;color:#a00&#34;&gt;${&lt;/span&gt;&lt;span style=&#34;color:#033&#34;&gt;linux_image&lt;/span&gt;&lt;span style=&#34;color:#a00&#34;&gt;}&lt;/span&gt;&lt;span style=&#34;color:#c30&#34;&gt;&amp;#34;&lt;/span&gt; &lt;span style=&#34;color:#c30&#34;&gt;&amp;#34;&lt;/span&gt;&lt;span style=&#34;color:#a00&#34;&gt;${&lt;/span&gt;&lt;span style=&#34;color:#033&#34;&gt;KERNEL_LIVE_DIR&lt;/span&gt;&lt;span style=&#34;color:#a00&#34;&gt;}&lt;/span&gt;&lt;span style=&#34;color:#c30&#34;&gt;/&amp;#34;&lt;/span&gt;
+    cp -u --preserve&lt;span style=&#34;color:#555&#34;&gt;=&lt;/span&gt;timestamps &lt;span style=&#34;color:#c30&#34;&gt;&amp;#34;&lt;/span&gt;&lt;span style=&#34;color:#a00&#34;&gt;${&lt;/span&gt;&lt;span style=&#34;color:#033&#34;&gt;initrd&lt;/span&gt;&lt;span style=&#34;color:#a00&#34;&gt;}&lt;/span&gt;&lt;span style=&#34;color:#c30&#34;&gt;&amp;#34;&lt;/span&gt; &lt;span style=&#34;color:#c30&#34;&gt;&amp;#34;&lt;/span&gt;&lt;span style=&#34;color:#a00&#34;&gt;${&lt;/span&gt;&lt;span style=&#34;color:#033&#34;&gt;KERNEL_LIVE_DIR&lt;/span&gt;&lt;span style=&#34;color:#a00&#34;&gt;}&lt;/span&gt;&lt;span style=&#34;color:#c30&#34;&gt;/&amp;#34;&lt;/span&gt;
+
+    &lt;span style=&#34;color:#09f;font-style:italic&#34;&gt;# create loader entry&lt;/span&gt;
+    cat &amp;gt; &lt;span style=&#34;color:#c30&#34;&gt;&amp;#34;&lt;/span&gt;&lt;span style=&#34;color:#a00&#34;&gt;${&lt;/span&gt;&lt;span style=&#34;color:#033&#34;&gt;esp&lt;/span&gt;&lt;span style=&#34;color:#a00&#34;&gt;}&lt;/span&gt;&lt;span style=&#34;color:#c30&#34;&gt;/loader/entries/proxmox-&lt;/span&gt;&lt;span style=&#34;color:#a00&#34;&gt;${&lt;/span&gt;&lt;span style=&#34;color:#033&#34;&gt;kver&lt;/span&gt;&lt;span style=&#34;color:#a00&#34;&gt;}&lt;/span&gt;&lt;span style=&#34;color:#c30&#34;&gt;.conf&amp;#34;&lt;/span&gt; &lt;span style=&#34;color:#c30&#34;&gt;&amp;lt;&amp;lt;- EOF
+&lt;/span&gt;&lt;span style=&#34;color:#c30&#34;&gt;            title    ${LOADER_TITLE}
+&lt;/span&gt;&lt;span style=&#34;color:#c30&#34;&gt;            version  ${kver}
+&lt;/span&gt;&lt;span style=&#34;color:#c30&#34;&gt;            options  ${CMDLINE}
+&lt;/span&gt;&lt;span style=&#34;color:#c30&#34;&gt;            linux    /${KERNEL_ESP_DIR}/vmlinuz-${kver}
+&lt;/span&gt;&lt;span style=&#34;color:#c30&#34;&gt;            initrd   /${KERNEL_ESP_DIR}/initrd.img-${kver}
+&lt;/span&gt;&lt;span style=&#34;color:#c30&#34;&gt;    EOF&lt;/span&gt;
+&lt;span style=&#34;color:#069;font-weight:bold&#34;&gt;done&lt;/span&gt;
+&lt;span style=&#34;color:#09f;font-style:italic&#34;&gt;# [...]&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;For us, the cat part is especially interesting: the &lt;code&gt;CMDLINE&lt;/code&gt; variable
+in the line beginning with &amp;ldquo;&lt;code&gt;options&lt;/code&gt;&amp;rdquo; contains the boot options for the
+Linux kernel. This variable is assigned in the same file:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span style=&#34;color:#09f;font-style:italic&#34;&gt;# [...]&lt;/span&gt;
+&lt;span style=&#34;color:#069;font-weight:bold&#34;&gt;if&lt;/span&gt; &lt;span style=&#34;color:#555&#34;&gt;[&lt;/span&gt; -f /etc/kernel/cmdline &lt;span style=&#34;color:#555&#34;&gt;]&lt;/span&gt;; &lt;span style=&#34;color:#069;font-weight:bold&#34;&gt;then&lt;/span&gt;
+  &lt;span style=&#34;color:#033&#34;&gt;CMDLINE&lt;/span&gt;&lt;span style=&#34;color:#555&#34;&gt;=&lt;/span&gt;&lt;span style=&#34;color:#c30&#34;&gt;&amp;#34;&lt;/span&gt;&lt;span style=&#34;color:#069;font-weight:bold&#34;&gt;$(&lt;/span&gt;cat /etc/kernel/cmdline&lt;span style=&#34;color:#069;font-weight:bold&#34;&gt;)&lt;/span&gt;&lt;span style=&#34;color:#c30&#34;&gt;&amp;#34;&lt;/span&gt;
+&lt;span style=&#34;color:#069;font-weight:bold&#34;&gt;else&lt;/span&gt;
+  warn &lt;span style=&#34;color:#c30&#34;&gt;&amp;#34;No /etc/kernel/cmdline found - falling back to /proc/cmdline&amp;#34;&lt;/span&gt;
+  &lt;span style=&#34;color:#033&#34;&gt;CMDLINE&lt;/span&gt;&lt;span style=&#34;color:#555&#34;&gt;=&lt;/span&gt;&lt;span style=&#34;color:#c30&#34;&gt;&amp;#34;&lt;/span&gt;&lt;span style=&#34;color:#069;font-weight:bold&#34;&gt;$(&lt;/span&gt;cat /proc/cmdline&lt;span style=&#34;color:#069;font-weight:bold&#34;&gt;)&lt;/span&gt;&lt;span style=&#34;color:#c30&#34;&gt;&amp;#34;&lt;/span&gt;
+&lt;span style=&#34;color:#069;font-weight:bold&#34;&gt;fi&lt;/span&gt;
+&lt;span style=&#34;color:#09f;font-style:italic&#34;&gt;# [...]&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;Apparently &lt;code&gt;/etc/kernel/cmdline&lt;/code&gt; is the place where Proxmox stores it&amp;rsquo;s
+boot options. The file contains one single line:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;root=ZFS=rpool/ROOT/pve-1 boot=zfs&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;After finding the &lt;code&gt;/etc/kernel/cmdline&lt;/code&gt; file, I did a bit of searching
+and according to the Proxmox &lt;a href=&#34;https://pve.proxmox.com/pve-docs/pve-admin-guide.html#sysboot%5Fedit%5Fkernel%5Fcmdline&#34;&gt;documentation&lt;/a&gt;, it is actually the
+apropriate file to change in this case.&lt;/p&gt;
+
+&lt;p&gt;Now that we have identified the file we can use to configure our
+kernel options, there are two things we want to add:&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;&lt;p&gt;we want to make sure the network interface comes up so that we can
+ssh into the initramfs, we will use the &lt;code&gt;ip&lt;/code&gt; option for that. It uses
+the following format (look &lt;a href=&#34;https://www.kernel.org/doc/Documentation/filesystems/nfs/nfsroot.txt&#34;&gt;here&lt;/a&gt; for further reading):&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;  ip=&amp;lt;client-ip&amp;gt;:&amp;lt;server-ip&amp;gt;:&amp;lt;gw-ip&amp;gt;:&amp;lt;netmask&amp;gt;:&amp;lt;hostname&amp;gt;:&amp;lt;device&amp;gt;:&amp;lt;autoconf&amp;gt;:
+&amp;lt;dns0-ip&amp;gt;:&amp;lt;dns1-ip&amp;gt;:&amp;lt;ntp0-ip&amp;gt;:&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;I omitted everything after autoconf, something like this works for
+me:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;ip=1.2.3.4::1.2.3.1:255.255.255.0:caliban:enpXsY:none:&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;also we have to tell the kernel which devices the cryptodevices are
+that we want to unlock, which is done using the &lt;code&gt;cryptodevice&lt;/code&gt; option
+(here we have to supply the PARTUUIDs for both of our harddrives):&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;cryptdevice=UUID=XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX cryptdevice=UUID=YYYYYYYY-YYYY-YYYY-YYYY-YYYYYYYYYYYY&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;p&gt;The whole content of &lt;code&gt;/etc/kernel/cmdline&lt;/code&gt; looks like this:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;ip=1.2.3.4::1.2.3.1:255.255.255.0:caliban:enpXsY:none: cryptdevice=UUID=XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX cryptdevice=UUID=YYYYYYYY-YYYY-YYYY-YYYY-YYYYYYYYYYYY root=ZFS=rpool/ROOT/pve-1 boot=zfs&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;The last thing to do is to:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;update-initramfs -u -k all
+pve-efiboot-tool refresh&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;Now you should be able to reboot your machine and ssh into the
+busybox on the port you just configured for &lt;code&gt;dropbear&lt;/code&gt;. From there
+you can unlock the drives by running something like
+this&lt;label class=&#34;margin-toggle sidenote-number&#34;&gt;&lt;/label&gt;&lt;span class=&#34;sidenote&#34;&gt; You&amp;rsquo;ll have to input it twice since you have two encrypted drives &lt;/span&gt;:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;echo -n &amp;#34;password&amp;#34; &amp;gt; /lib/cryptsetup/passfifo&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;Or:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;/lib/cryptsetup/askpass &amp;#34;password: &amp;#34; &amp;gt; /lib/cryptsetup/passfifo&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;Or you can also use the &lt;code&gt;cryptroot-unlock&lt;/code&gt; script that is preinstalled
+already, which also prompts you to enter the password twice.&lt;/p&gt;
+
+&lt;p&gt;If you&amp;rsquo;re lazy, you can also use put the following script into
+&lt;code&gt;/etc/initramfs-tools/hooks&lt;/code&gt; and make it executable. I basically
+merged the above example of using &lt;code&gt;/lib/cryptsetup/askpass&lt;/code&gt; with a
+version of a unlock script I had lying around, it looks like it
+might have been from this &lt;a href=&#34;https://gist.github.com/gusennan/712d6e81f5cf9489bd9f&#34;&gt;gist&lt;/a&gt;. It asks you for a passphrase and
+then uses echo to write it into &lt;code&gt;/lib/cryptsetup/passfifo&lt;/code&gt; twice
+(since I use 2 harddrives) with one second delay in between, then
+kills the session so the system can come up&lt;label class=&#34;margin-toggle sidenote-number&#34;&gt;&lt;/label&gt;&lt;span class=&#34;sidenote&#34;&gt; I noticed, that /etc/motd, which contains instructions on how to unlock your drive is not displayed in the busybox session. &lt;/span&gt;. You probably shouldn&amp;rsquo;t use it, but it seems to work
+for me:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span style=&#34;color:#099&#34;&gt;#!/bin/sh
+&lt;/span&gt;&lt;span style=&#34;color:#099&#34;&gt;&lt;/span&gt;
+&lt;span style=&#34;color:#033&#34;&gt;PREREQ&lt;/span&gt;&lt;span style=&#34;color:#555&#34;&gt;=&lt;/span&gt;&lt;span style=&#34;color:#c30&#34;&gt;&amp;#34;dropbear&amp;#34;&lt;/span&gt;
+
+prereqs&lt;span style=&#34;color:#555&#34;&gt;()&lt;/span&gt; &lt;span style=&#34;color:#555&#34;&gt;{&lt;/span&gt;
+    &lt;span style=&#34;color:#366&#34;&gt;echo&lt;/span&gt; &lt;span style=&#34;color:#c30&#34;&gt;&amp;#34;&lt;/span&gt;&lt;span style=&#34;color:#033&#34;&gt;$PREREQ&lt;/span&gt;&lt;span style=&#34;color:#c30&#34;&gt;&amp;#34;&lt;/span&gt;
+&lt;span style=&#34;color:#555&#34;&gt;}&lt;/span&gt;
+
+&lt;span style=&#34;color:#069;font-weight:bold&#34;&gt;case&lt;/span&gt; &lt;span style=&#34;color:#c30&#34;&gt;&amp;#34;&lt;/span&gt;&lt;span style=&#34;color:#033&#34;&gt;$1&lt;/span&gt;&lt;span style=&#34;color:#c30&#34;&gt;&amp;#34;&lt;/span&gt; in
+    prereqs&lt;span style=&#34;color:#555&#34;&gt;)&lt;/span&gt;
+        prereqs
+        &lt;span style=&#34;color:#366&#34;&gt;exit&lt;/span&gt; &lt;span style=&#34;color:#f60&#34;&gt;0&lt;/span&gt;
+        ;;
+&lt;span style=&#34;color:#069;font-weight:bold&#34;&gt;esac&lt;/span&gt;
+
+. &lt;span style=&#34;color:#c30&#34;&gt;&amp;#34;&lt;/span&gt;&lt;span style=&#34;color:#a00&#34;&gt;${&lt;/span&gt;&lt;span style=&#34;color:#033&#34;&gt;CONFDIR&lt;/span&gt;&lt;span style=&#34;color:#a00&#34;&gt;}&lt;/span&gt;&lt;span style=&#34;color:#c30&#34;&gt;/initramfs.conf&amp;#34;&lt;/span&gt;
+. /usr/share/initramfs-tools/hook-functions
+
+&lt;span style=&#34;color:#069;font-weight:bold&#34;&gt;if&lt;/span&gt; &lt;span style=&#34;color:#555&#34;&gt;[&lt;/span&gt; &lt;span style=&#34;color:#c30&#34;&gt;&amp;#34;&lt;/span&gt;&lt;span style=&#34;color:#a00&#34;&gt;${&lt;/span&gt;&lt;span style=&#34;color:#033&#34;&gt;DROPBEAR&lt;/span&gt;&lt;span style=&#34;color:#a00&#34;&gt;}&lt;/span&gt;&lt;span style=&#34;color:#c30&#34;&gt;&amp;#34;&lt;/span&gt; !&lt;span style=&#34;color:#555&#34;&gt;=&lt;/span&gt; &lt;span style=&#34;color:#c30&#34;&gt;&amp;#34;n&amp;#34;&lt;/span&gt; &lt;span style=&#34;color:#555&#34;&gt;]&lt;/span&gt; &lt;span style=&#34;color:#555&#34;&gt;&amp;amp;&amp;amp;&lt;/span&gt; &lt;span style=&#34;color:#555&#34;&gt;[&lt;/span&gt; -r &lt;span style=&#34;color:#c30&#34;&gt;&amp;#34;/etc/crypttab&amp;#34;&lt;/span&gt; &lt;span style=&#34;color:#555&#34;&gt;]&lt;/span&gt; ; &lt;span style=&#34;color:#069;font-weight:bold&#34;&gt;then&lt;/span&gt;
+
+    cat &amp;gt; &lt;span style=&#34;color:#c30&#34;&gt;&amp;#34;&lt;/span&gt;&lt;span style=&#34;color:#a00&#34;&gt;${&lt;/span&gt;&lt;span style=&#34;color:#033&#34;&gt;DESTDIR&lt;/span&gt;&lt;span style=&#34;color:#a00&#34;&gt;}&lt;/span&gt;&lt;span style=&#34;color:#c30&#34;&gt;/bin/unlock&amp;#34;&lt;/span&gt; &lt;span style=&#34;color:#c30&#34;&gt;&amp;lt;&amp;lt; EOF
+&lt;/span&gt;&lt;span style=&#34;color:#c30&#34;&gt;#!/bin/sh
+&lt;/span&gt;&lt;span style=&#34;color:#c30&#34;&gt;unlock_devices() {
+&lt;/span&gt;&lt;span style=&#34;color:#c30&#34;&gt;  pw=&amp;#34;\$(/lib/cryptsetup/askpass &amp;#34;password: &amp;#34;)&amp;#34;
+&lt;/span&gt;&lt;span style=&#34;color:#c30&#34;&gt;  echo -n \$pw &amp;gt; /lib/cryptsetup/passfifo
+&lt;/span&gt;&lt;span style=&#34;color:#c30&#34;&gt;  sleep 1
+&lt;/span&gt;&lt;span style=&#34;color:#c30&#34;&gt;  echo -n \$pw &amp;gt; /lib/cryptsetup/passfifo
+&lt;/span&gt;&lt;span style=&#34;color:#c30&#34;&gt;}
+&lt;/span&gt;&lt;span style=&#34;color:#c30&#34;&gt;if unlock_devices; then
+&lt;/span&gt;&lt;span style=&#34;color:#c30&#34;&gt;# kill \`ps | grep cryptroot | grep -v &amp;#34;grep&amp;#34; | awk &amp;#39;{print \$1}&amp;#39;\`
+&lt;/span&gt;&lt;span style=&#34;color:#c30&#34;&gt;# following line kill the remote shell right after the passphrase has
+&lt;/span&gt;&lt;span style=&#34;color:#c30&#34;&gt;# been entered.
+&lt;/span&gt;&lt;span style=&#34;color:#c30&#34;&gt;kill -9 \`ps | grep &amp;#34;\-sh&amp;#34; | grep -v &amp;#34;grep&amp;#34; | awk &amp;#39;{print \$1}&amp;#39;\`
+&lt;/span&gt;&lt;span style=&#34;color:#c30&#34;&gt;exit 0
+&lt;/span&gt;&lt;span style=&#34;color:#c30&#34;&gt;fi
+&lt;/span&gt;&lt;span style=&#34;color:#c30&#34;&gt;exit 1
+&lt;/span&gt;&lt;span style=&#34;color:#c30&#34;&gt;EOF&lt;/span&gt;
+
+    chmod &lt;span style=&#34;color:#f60&#34;&gt;755&lt;/span&gt; &lt;span style=&#34;color:#c30&#34;&gt;&amp;#34;&lt;/span&gt;&lt;span style=&#34;color:#a00&#34;&gt;${&lt;/span&gt;&lt;span style=&#34;color:#033&#34;&gt;DESTDIR&lt;/span&gt;&lt;span style=&#34;color:#a00&#34;&gt;}&lt;/span&gt;&lt;span style=&#34;color:#c30&#34;&gt;/bin/unlock&amp;#34;&lt;/span&gt;
+
+    mkdir -p &lt;span style=&#34;color:#c30&#34;&gt;&amp;#34;&lt;/span&gt;&lt;span style=&#34;color:#a00&#34;&gt;${&lt;/span&gt;&lt;span style=&#34;color:#033&#34;&gt;DESTDIR&lt;/span&gt;&lt;span style=&#34;color:#a00&#34;&gt;}&lt;/span&gt;&lt;span style=&#34;color:#c30&#34;&gt;/lib/unlock&amp;#34;&lt;/span&gt;
+    cat &amp;gt; &lt;span style=&#34;color:#c30&#34;&gt;&amp;#34;&lt;/span&gt;&lt;span style=&#34;color:#a00&#34;&gt;${&lt;/span&gt;&lt;span style=&#34;color:#033&#34;&gt;DESTDIR&lt;/span&gt;&lt;span style=&#34;color:#a00&#34;&gt;}&lt;/span&gt;&lt;span style=&#34;color:#c30&#34;&gt;/lib/unlock/plymouth&amp;#34;&lt;/span&gt; &lt;span style=&#34;color:#c30&#34;&gt;&amp;lt;&amp;lt; EOF
+&lt;/span&gt;&lt;span style=&#34;color:#c30&#34;&gt;#!/bin/sh
+&lt;/span&gt;&lt;span style=&#34;color:#c30&#34;&gt;[ &amp;#34;\$1&amp;#34; == &amp;#34;--ping&amp;#34; ] &amp;amp;&amp;amp; exit 1
+&lt;/span&gt;&lt;span style=&#34;color:#c30&#34;&gt;/bin/plymouth &amp;#34;\$@&amp;#34;
+&lt;/span&gt;&lt;span style=&#34;color:#c30&#34;&gt;EOF&lt;/span&gt;
+
+    chmod &lt;span style=&#34;color:#f60&#34;&gt;755&lt;/span&gt; &lt;span style=&#34;color:#c30&#34;&gt;&amp;#34;&lt;/span&gt;&lt;span style=&#34;color:#a00&#34;&gt;${&lt;/span&gt;&lt;span style=&#34;color:#033&#34;&gt;DESTDIR&lt;/span&gt;&lt;span style=&#34;color:#a00&#34;&gt;}&lt;/span&gt;&lt;span style=&#34;color:#c30&#34;&gt;/lib/unlock/plymouth&amp;#34;&lt;/span&gt;
+
+    &lt;span style=&#34;color:#366&#34;&gt;echo&lt;/span&gt; To unlock root-partition run &lt;span style=&#34;color:#c30&#34;&gt;&amp;#34;unlock&amp;#34;&lt;/span&gt; &amp;gt;&amp;gt; &lt;span style=&#34;color:#a00&#34;&gt;${&lt;/span&gt;&lt;span style=&#34;color:#033&#34;&gt;DESTDIR&lt;/span&gt;&lt;span style=&#34;color:#a00&#34;&gt;}&lt;/span&gt;/etc/motd
+&lt;span style=&#34;color:#069;font-weight:bold&#34;&gt;fi&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;That&amp;rsquo;s pretty much all of it, you can now start enjoying remote
+reboots on your freshly encrypted Proxmox host.&lt;/p&gt;
+</description>
+			</item>
+			
+	</channel>
+</rss>

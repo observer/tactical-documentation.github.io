@@ -1,0 +1,937 @@
+<!DOCTYPE html>
+<html lang="en-us">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <meta name="HandheldFriendly" content="True">
+    <meta name="MobileOptimized" content="320">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="referrer" content="no-referrer">
+    
+
+    <title>
+      
+      
+         Proxmox VE 6 Setup: ZFS, LUKS, systemd-boot and Dropbear 
+      
+    </title>
+    <link rel="canonical" href="https://tactical-documentation.github.io/post/proxmoxve6-zfs-luks-systemdboot-dropbear/">
+
+    <style>
+
+  @font-face {
+    font-family: 'Comfortaa';
+    font-style: normal;
+    font-weight: 400;
+    src: local('Comfortaa Regular'), url('/fonts/Comfortaa-Regular.ttf');
+  }
+  
+  @font-face {
+    font-family: 'Inconsolata';
+    font-style: normal;
+    font-weight: 400;
+    src: local('Inconsolata Regular'), url('/fonts/Inconsolata-Regular.ttf');
+  }
+
+  @font-face {
+    font-family: 'Montserrat';
+    font-style: normal;
+    font-weight: 400;
+    src: local('Montserrat Regular'), url('/fonts/Montserrat-Regular.ttf');
+  }
+  
+  * {
+    border:0;
+    font:inherit;
+    font-size:100%;
+    vertical-align:middle;
+    margin:0;
+    padding:0;
+    color: black;
+    text-decoration-skip: ink;
+  }
+
+  body {
+    font-family: Montserrat, 'Open Sans', 'Myriad Pro', Myriad, sans-serif;
+    font-size:17px;
+    line-height:160%;
+    color:#1d1313;
+    max-width:700px;
+    margin:auto;
+    counter-reset: sidenote-counter;
+  }
+
+
+  label.sidenote-number { display: inline; }
+
+  .sidenote, .marginnote { float: right;
+                         clear: right;
+                         margin-right: -60%;
+                         width: 50%;
+                         margin-top: 0;
+                         margin-bottom: 0;
+                         font-size: 10px;
+                         color: grey;
+                         line-height: 1.3;
+                         vertical-align: baseline;
+                         position: relative; }
+
+  .sidenote-number { counter-increment: sidenote-counter; }
+  
+  .sidenote-number:after, .sidenote:before { font-family: et-book-roman-old-style;
+                                             position: relative;
+                                             vertical-align: baseline; }
+  
+  .sidenote-number:after { content: counter(sidenote-counter);
+                           font-size: 10px;
+                           top: -0.5rem;
+                           left: 0.1rem; }
+  
+  .sidenote:before { content: counter(sidenote-counter) " ";
+                     font-size: 7px;
+                     top: -0.5rem; }
+  
+  blockquote .sidenote, { margin-right: -82%;
+                                                 min-width: 59%;
+                                                 text-align: left; }
+  
+  .marginnote > code,
+  .sidenote > code {
+    font-size: 10px; 
+    padding: 2px;
+  }
+
+
+  p {
+    margin: 20px 0;
+  }
+
+  a img {
+    border:none;
+  }
+
+  img {
+    margin: 10px auto 10px auto;
+    max-width: 100%;
+    display: block;
+  }
+
+  table {
+    display: table;
+    border: 1px solid black;
+    border-collapse: collapse;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  th, td {
+    padding: 5px;
+    border: 1px solid black;
+    text-align: left;
+  }
+
+  .table-caption {
+    text-align:center;
+  }
+  
+  figcaption {
+    text-align:center;
+  }
+
+  th {
+    font-weight: bold;
+  }
+
+  .left-justify {
+    float: left;
+  }
+
+  .right-justify {
+    float:right;
+  }
+
+  pre, code {
+    font: 12px Inconsolata, Consolas, "Liberation Mono", Menlo, Courier, monospace;
+    background-color: #f7f7f7;
+  }
+
+  code {
+    font-size: 12px;
+    padding: 4px;
+  }
+
+  pre {
+    margin-top: 0;
+    margin-bottom: 16px;
+    word-wrap: normal;
+    padding: 16px;
+    overflow: auto;
+    font-size: 85%;
+    line-height: 1.45;
+  }
+
+  pre>code {
+    padding: 0;
+    margin: 0;
+    font-size: 100%;
+    word-break: normal;
+    white-space: pre;
+    background: transparent;
+    border: 0;
+  }
+
+  pre code {
+    display: inline;
+    max-width: auto;
+    padding: 0;
+    margin: 0;
+    overflow: visible;
+    line-height: inherit;
+    word-wrap: normal;
+    background-color: transparent;
+    border: 0;
+  }
+
+  pre code::before,
+  pre code::after {
+    content: normal;
+  }
+
+  em,q,em,dfn {
+    font-style:italic;
+  }
+
+  .sans,html .gist .gist-file .gist-meta {
+    font-family: Montserrat, "Open Sans","Myriad Pro",Myriad,sans-serif;
+  }
+
+  .mono,pre,code,tt,p code,li code {
+    font-family:Inconsolata, Menlo,Monaco,"Andale Mono","lucida console","Courier New",monospace;
+  }
+
+  .heading,.serif,h1,h2,h3 {
+    font-family:"Comfortaa";
+  }
+
+  strong {
+    font-weight:600;
+  }
+
+  q:before {
+    content:"\201C";
+  }
+
+  q:after {
+    content:"\201D";
+  }
+
+  del,s {
+    text-decoration:line-through;
+  }
+
+  blockquote {
+    font-family:"Comfortaa";
+    text-align:center;
+    padding:50px;
+  }
+
+  blockquote p {
+    display:inline-block;
+    font-style:italic;
+  }
+
+  blockquote:before,blockquote:after {
+    font-family:"Comfortaa";
+    content:'\201C';
+    font-size:30px;
+    color:#403c3b;
+  }
+
+  blockquote:after {
+    content:'\201D';
+  }
+
+  hr {
+    width:40%;
+    height: 1px;
+    background:#403c3b;
+    margin: 25px auto;
+  }
+
+  h1 {
+    font-size:35px;
+  }
+
+  h2 {
+    font-size:28px;
+  }
+
+  h3 {
+    font-size:22px;
+    margin-top:18px;
+  }
+
+  h1 a,h2 a,h3 a {
+    text-decoration:none;
+  }
+
+  h1,h2 {
+    margin-top:28px;
+  }
+
+  #sub-header, time {
+    color:#403c3b;
+    font-size:13px;
+  }
+
+  #sub-header {
+    margin: 0 4px;
+  }
+
+  #nav h1 a {
+    font-size:35px;
+    color:#1d1313;
+    line-height:120%;
+  }
+
+  .posts_listing a,#nav a {
+    text-decoration: none;
+  }
+
+  li {
+    margin-left: 20px;
+  }
+
+  ul li {
+    margin-left: 5px;
+  }
+
+  ul li {
+    list-style-type: none;
+  }
+  ul li:before {
+    content:"\00B7 \0020";
+  }
+
+  #nav ul li:before, .posts_listing li:before {
+    content:'';
+    margin-right:0;
+  }
+
+  #content {
+    text-align:left;
+    width:100%;
+    font-size:15px;
+    padding:60px 0 80px;
+  }
+
+  #content h1,#content h2 {
+    margin-bottom:5px;
+  }
+
+  #content h2 {
+    font-size:25px;
+  }
+
+  #content .entry-content {
+    margin-top:15px;
+  }
+
+  #content time {
+    margin-left:3px;
+  }
+
+  #content h1 {
+    font-size:30px;
+  }
+
+  .highlight {
+    margin: 10px 0;
+  }
+
+  .posts_listing {
+    margin:0 0 50px;
+  }
+
+  .posts_listing li {
+    margin:0 0 0 15px;
+  }
+
+  .posts_listing li a:hover,#nav a:hover {
+    text-decoration: underline;
+  }
+
+  #nav {
+    text-align:center;
+    position:static;
+    margin-top:60px;
+  }
+
+  #nav ul {
+    display: table;
+    margin: 8px auto 0 auto;
+  }
+
+  #nav li {
+    list-style-type:none;
+    display:table-cell;
+    font-size:15px;
+    padding: 0 20px;
+  }
+
+  #links {
+    margin: 50px 0 0 0;
+  }
+
+  #links :nth-child(2) {
+    float:right;
+  }
+
+  #not-found {
+    text-align: center;
+  }
+
+  #not-found a {
+    font-family:"Comfortaa";
+    font-size: 200px;
+    text-decoration: none;
+    display: inline-block;
+    padding-top: 225px;
+  }
+
+  #menu a {
+    color: #aaa;
+    font-family: Montserrat, "Menu",sans-serif;
+     
+    font-size: 9.65px;
+    margin-right: 0.85em;
+    text-shadow: 0 1px 1px #fff;
+  }
+
+
+  span.left { float: left; }
+
+  span.right {
+    float: right;
+    margin-right: -0.85em;
+  }
+
+  @media (max-width: 750px) {
+    body {
+      padding-left:20px;
+      padding-right:20px;
+    }
+
+    #nav h1 a {
+      font-size:28px;
+    }
+
+    #nav li {
+      font-size:13px;
+      padding: 0 15px;
+    }
+
+    #content {
+      margin-top:0;
+      padding-top:50px;
+      font-size:14px;
+    }
+
+    #content h1 {
+      font-size:25px;
+    }
+
+    #content h2 {
+      font-size:22px;
+    }
+
+    .posts_listing li div {
+      font-size:12px;
+    }
+
+
+    .sidenote, .marginnote { display: block;
+                             float: left;
+                             left: 1rem;
+                             clear: both;
+                             width: 95%;
+                             line-height: 1;
+                             margin: 1rem 2.5%;
+                             vertical-align: baseline;
+                             position: relative; }
+
+
+  }
+
+  @media (max-width: 400px) {
+    body {
+      padding-left:20px;
+      padding-right:20px;
+    }
+
+    #nav h1 a {
+      font-size:22px;
+    }
+
+    #nav li {
+      font-size:12px;
+      padding: 0 10px;
+    }
+
+    #content {
+      margin-top:0;
+      padding-top:20px;
+      font-size:12px;
+    }
+
+    #content h1 {
+      font-size:20px;
+    }
+
+    #content h2 {
+      font-size:18px;
+    }
+
+    .posts_listing li div{
+      font-size:12px;
+    }
+  }
+</style>
+
+
+  </head>
+
+  <body>
+    <div id="menu">
+      <span class="left" style="display:inline:block">    
+          <font size="10"> <a href="https://tactical-documentation.github.io">tactical-documentation</a> </font>
+      </span>
+      <span class="right" style="display:inline:block">    
+          <font size="10"> <a href="https://tactical-documentation.github.io/tags">tags</a> </font>
+      
+        
+          <font size="10"> <a href="https://tactical-documentation.github.io/about/">about</a> </font>
+        
+      
+        
+      
+        
+          <font size="10"> <a href="https://tactical-documentation.github.io/src/">src</a> </font>
+        
+      
+          <font size="10"> <a href="https://tactical-documentation.github.io/index.xml">rss</a> </font>
+      </span>
+    </div>
+
+
+<section id=content>
+  <h1> Proxmox VE 6 Setup: ZFS, LUKS, systemd-boot and Dropbear </h1>
+
+  
+    <div id=sub-header>
+      August 2019 · 10 minute read
+    </div>
+  
+
+   
+   
+  
+  <div id=sub-header>
+    <ul id="tags">
+    Tags:
+        
+            
+            
+                <a href="https://tactical-documentation.github.io/tags/proxmox/">proxmox</a>
+            
+        
+            
+            
+                <a href="https://tactical-documentation.github.io/tags/zfs/">zfs</a>
+            
+        
+            
+            
+                <a href="https://tactical-documentation.github.io/tags/luks/">luks</a>
+            
+        
+            
+            
+                <a href="https://tactical-documentation.github.io/tags/systemd-boot/">systemd-boot</a>
+            
+        
+            
+            
+                <a href="https://tactical-documentation.github.io/tags/dropbear/">dropbear</a>
+            
+        
+    </ul>
+  </div>
+  
+
+  <div class="entry-content">
+    
+
+<p>This describes how to set up a fully encrypted Proxmox VE 6 host
+with ZFS root and unlocking it remotely using the dropbear ssh
+server. Also it describes how you can do that, while keeping
+systemd-boot and thus also the pve tooling intact<label class="margin-toggle sidenote-number"></label><span class="sidenote"> I&rsquo;m not sure if the pve tooling still works if you replace systemd-boot with grub, which seems to be the common solution to setting up this kind of setup,maybe it does </span>.</p>
+
+<h2 id="overview">Overview</h2>
+
+<p>We are going to do the following:</p>
+
+<ol>
+<li>Install Proxmox VE 6 on our machine</li>
+<li>Minimally configure the Installation</li>
+<li>Encrypt the Installation:
+
+<ol>
+<li>Remove a Disk from the ZFS-Pool</li>
+<li>Encrypt the Disk with LUKS</li>
+<li>Add it back to the ZFS Pool</li>
+<li>Repeat until all disks are encrypted</li>
+</ol></li>
+<li>Set up Dropbear and Systemd-boot to enable remote unlocking</li>
+</ol>
+
+<h2 id="prerequisites">Prerequisites</h2>
+
+<p>There really only is one prerequisite apart from having a machine
+you want to install Proxmox onto: You need a second harddrive,
+which we will setup in a ZFS RAID1 configuration. If you don&rsquo;t
+want to have your root devices mirrored, you will still need a
+second drive that you can use as a temporary mirrored root device,
+otherwise you&rsquo;d have to install and set up an encrypted debian and
+then install proxmox on top of that.</p>
+
+<p>Apart from that I&rsquo;ll assume that you are probably fairly familiar
+with how full disk encryption works on linux systems, if not you
+might want to read up on that before you start messing around with
+any hardware. Please don&rsquo;t try this out on a production system,
+if you don&rsquo;t exactly know what you&rsquo;re doing.</p>
+
+<h2 id="installing-proxmox-ve-6">Installing Proxmox VE 6</h2>
+
+<p>The only thing you have to make sure is to set up the ZFS RAID 1
+during the installation. The rest should be pretty much
+straight-forward.</p>
+
+<h2 id="minimal-post-installation">Minimal post-installation</h2>
+
+<p>For some odd reason <code>PATH</code> in a regular shell is different from <code>PATH</code>
+in the javascript terminal from the webinterface. You might want
+to take care of that:</p>
+<div class="highlight"><pre style="background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-bash" data-lang="bash"><span style="color:#366">export</span> <span style="color:#033">PATH</span><span style="color:#555">=</span>/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin</code></pre></div>
+<p>Remove the subscription popup notice (<a href="https://johnscs.com/remove-proxmox51-subscription-notice/">source</a>):</p>
+<div class="highlight"><pre style="background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-bash" data-lang="bash">sed -i.bak <span style="color:#c30">&#34;s/data.status !== &#39;Active&#39;/false/g&#34;</span> /usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js <span style="color:#555">&amp;&amp;</span> systemctl restart pveproxy.service</code></pre></div>
+<p>Set up the community repositories:</p>
+<div class="highlight"><pre style="background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-bash" data-lang="bash">rm /etc/apt/sources.list.d/pve-enterprise.list
+<span style="color:#366">echo</span> <span style="color:#c30">&#39;deb http://download.proxmox.com/debian/pve buster pve-no-subscription&#39;</span> &gt; pve-community.list</code></pre></div>
+<p>Update the host:</p>
+<div class="highlight"><pre style="background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-bash" data-lang="bash">apt update
+apt upgrade</code></pre></div>
+<h2 id="encrypt-your-installation">Encrypt your installation</h2>
+
+<p>This is partly taken over from <a href="https://forums.servethehome.com/index.php?threads/proxmox-zfs-encryption-guide-work-in-progress.23004/#post-215138">this wonderful post</a><label class="margin-toggle sidenote-number"></label><span class="sidenote"> The GRUB_ENABLE_CRYPTODISK option that is mentioned in the <a href="https://forums.servethehome.com/index.php?threads/proxmox-zfs-encryption-guide-work-in-progress.23004/#post-215138">forum post</a> does not apply here, since the boot partition is not encrypted. If you want this level of security, then this is probably not the right guide for you. Also from my understanding encrypting the boot partition means that you can&rsquo;t use dropbear to unlock the system remotely since nothing has booted so far. It is a pretty nice way to set up fully encrypted laptops though, so you should definitely look into this if you haven&rsquo;t already! </span>.</p>
+
+<p>Right after the installation the host should look similiar to this
+(<code>lsblk</code>):</p>
+<div class="highlight"><pre style="background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-text" data-lang="text">NAME            MAJ:MIN RM   SIZE RO TYPE  MOUNTPOINT
+sda               8:0    0 465.8G  0 disk
+├─sda1            8:1    0  1007K  0 part
+├─sda2            8:2    0   512M  0 part
+└─sda3            8:3    0 465.3G  0 part
+sdb               8:16   0 931.5G  0 disk
+sdc               8:32   0 931.5G  0 disk
+sdd               8:48   0 465.8G  0 disk
+├─sdd1            8:49   0  1007K  0 part
+├─sdd2            8:50   0   512M  0 part
+└─sdd3            8:51   0 465.3G  0 part</code></pre></div>
+<p>The third partition of both harddrives contains our installation,
+the first and second are the boot and efi partitions.</p>
+
+<p><code>zpool status</code> should return something like this:</p>
+<div class="highlight"><pre style="background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-text" data-lang="text">NAME             STATE     READ WRITE CKSUM
+rpool            ONLINE       0     0     0
+  mirror-0       ONLINE       0     0     0
+    ata-Samsung_SSD_850_EVO_500GB_XXXXXXXXXXXXXXX-part3  ONLINE       0     0     0
+    ata-WDC_WDS500G2B0A-XXXXXX_XXXXXXXXXXXX-part3        ONLINE       0     0     0</code></pre></div>
+<p>You might want to install <code>cryptsetup</code> at this point:</p>
+<div class="highlight"><pre style="background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-bash" data-lang="bash">apt install cryptsetup</code></pre></div>
+<p>Remove the first partition from <code>rpool</code>, then encrypt it, mount it
+to <code>/dev/mapper/cryptrpool1</code> and reattach it to <code>rpool</code>:</p>
+<div class="highlight"><pre style="background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-bash" data-lang="bash">zpool detach rpool ata-Samsung_SSD_850_EVO_500GB_XXXXXXXXXXXXXXX-part3
+cryptsetup luksFormat /dev/disk/by-id/ata-Samsung_SSD_850_EVO_500GB_XXXXXXXXXXXXXXX-part3
+cryptsetup luksOpen /dev/disk/by-id/ata-Samsung_SSD_850_EVO_500GB_XXXXXXXXXXXXXXX-part3 cryptrpool1
+zpool attach rpool ata-Samsung_SSD_850_EVO_500GB_XXXXXXXXXXXXXXX-part3 cryptrpool1</code></pre></div>
+<p>Wait until the <code>scan</code> line of <code>zpool status</code> displays that the drive
+has been resilvered successfully. You should see something
+similiar to this:</p>
+<div class="highlight"><pre style="background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-text" data-lang="text">scan: resilvered 1022M in 0 days 00:00:04 with 0 errors on Wed Aug 21 17:27:55 2019</code></pre></div>
+<p>Now repeat this step with the other drive:</p>
+<div class="highlight"><pre style="background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-bash" data-lang="bash">zpool detach rpool ata-WDC_WDS500G2B0A-XXXXXX_XXXXXXXXXXXX-part3
+cryptsetup luksFormat /dev/disk/by-id/ata-WDC_WDS500G2B0A-XXXXXX_XXXXXXXXXXXX-part3
+cryptsetup luksOpen /dev/disk/by-id/ata-WDC_WDS500G2B0A-XXXXXX_XXXXXXXXXXXX-part3 cryptrpool2
+zpool attach rpool cryptrpool1 cryptrpool2</code></pre></div>
+<p>At this point <code>lsblk</code> should output something like this:</p>
+<div class="highlight"><pre style="background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-text" data-lang="text">NAME            MAJ:MIN RM   SIZE RO TYPE  MOUNTPOINT
+sda               8:0    0 465.8G  0 disk
+├─sda1            8:1    0  1007K  0 part
+├─sda2            8:2    0   512M  0 part
+└─sda3            8:3    0 465.3G  0 part
+  └─cryptrpool1 253:0    0 465.3G  0 crypt
+sdb               8:16   0 931.5G  0 disk
+sdc               8:32   0 931.5G  0 disk
+sdd               8:48   0 465.8G  0 disk
+├─sdd1            8:49   0  1007K  0 part
+├─sdd2            8:50   0   512M  0 part
+└─sdd3            8:51   0 465.3G  0 part
+  └─cryptrpool2 253:1    0 465.3G  0 crypt</code></pre></div>
+<p>And <code>zpool status</code> should return something like this:</p>
+<div class="highlight"><pre style="background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-text" data-lang="text">NAME             STATE     READ WRITE CKSUM
+rpool            ONLINE       0     0     0
+  mirror-0       ONLINE       0     0     0
+    cryptrpool1  ONLINE       0     0     0
+    cryptrpool2  ONLINE       0     0     0</code></pre></div>
+<p>Next we want to set up <code>/etc/crypttab</code>, use <code>blkid</code> to get the
+<code>PARTUUID</code> from both harddrives:</p>
+<div class="highlight"><pre style="background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-bash" data-lang="bash">blkid -s PARTUUID -o value /dev/disk/by-id/ata-Samsung_SSD_850_EVO_500GB_XXXXXXXXXXXXXXX-part3
+blkid -s PARTUUID -o value /dev/disk/by-id/ata-WDC_WDS500G2B0A-XXXXXX_XXXXXXXXXXXX-part3</code></pre></div>
+<p>Then add them to <code>/etc/crypttab</code> <label class="margin-toggle sidenote-number"></label><span class="sidenote"> <code>caliban</code> is the name of my proxmox host. </span>:</p>
+<div class="highlight"><pre style="background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-text" data-lang="text">root@caliban:~# cat /etc/crypttab
+# &lt;target name&gt; &lt;source device&gt;                                &lt;key file&gt;      &lt;options&gt;
+  cryptrpool1   PARTUUID=XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX  none            luks,discard,initramfs
+  cryptrpool2   PARTUUID=YYYYYYYY-YYYY-YYYY-YYYY-YYYYYYYYYYYY  none            luks,discard,initramfs</code></pre></div>
+<p>Then update the initramfs and make sure it is put on the boot
+partition (this is where we deviate from the forum post I&rsquo;ve linked
+above):</p>
+<div class="highlight"><pre style="background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-bash" data-lang="bash">update-initramfs -u -k all
+pve-efiboot-tool refresh</code></pre></div>
+<p>In case you&rsquo;re wondering at this point, yes I&rsquo;m also getting the
+<code>cryptsetup</code> error message on running <code>update-initramfs</code>, it still works
+though:</p>
+<div class="highlight"><pre style="background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-text" data-lang="text">cryptsetup: ERROR: Couldn&#39;t resolve device rpool/ROOT/pve-1
+cryptsetup: WARNING: Couldn&#39;t determine root device</code></pre></div>
+<p>Now you should be able to reboot and unlock the ZFS partitions by
+entering the passphrase.</p>
+
+<h2 id="setting-up-dropbear-to-remotely-unlock-the-partition">Setting up Dropbear to remotely unlock the partition</h2>
+
+<p>Now to the fun part! Since we aren&rsquo;t using <code>grub</code> here, we have to take
+a few different steps from what we usually do in this kind of
+setup.</p>
+
+<p>Here are a few interesting links you might want to look into as well:</p>
+
+<ul>
+<li><a href="https://www.pbworks.net/ubuntu-guide-dropbear-ssh-server-to-unlock-luks-encrypted-pc/">This</a> nicely explains how to use the keys Dropbear already generates on
+install instead of recreating them.</li>
+<li>The freedesktop page on <a href="https://www.freedesktop.org/wiki/Software/systemd/systemd-boot/">systemd-boot</a></li>
+<li><a href="https://adfinis-sygroup.ch/en/blog/decrypt-luks-devices-remotely-via-dropbear-ssh/">This little article</a> on setting up <code>archlinux</code> with <code>dropbear</code> does
+not fully apply to our Proxmox case, but it gives enough
+information on how we can tell <code>systemd-boot</code> to tell the kernel
+to start with the options we want<label class="margin-toggle sidenote-number"></label><span class="sidenote"> unlike the article states, we need to use the udev name for assigning the IP and I was getting error messages, when supplying nameserver IPs </span>.</li>
+</ul>
+
+<p>First install <code>dropbear</code> and <code>busybox</code>:</p>
+<div class="highlight"><pre style="background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-bash" data-lang="bash">apt install dropbear busybox</code></pre></div>
+<p>In <code>/etc/initramfs-tools/initramfs.conf</code> enable busybox:</p>
+<div class="highlight"><pre style="background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-text" data-lang="text">root@caliban:~# cat /etc/initramfs-tools/initramfs.conf | grep ^BUSYBOX
+BUSYBOX=y</code></pre></div>
+<p>Then convert the dropbear keys:</p>
+<div class="highlight"><pre style="background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-bash" data-lang="bash"><span style="color:#366">cd</span> /etc/dropbear-initramfs/
+/usr/lib/dropbear/dropbearconvert dropbear openssh dropbear_rsa_host_key id_rsa
+dropbearkey -y -f dropbear_rsa_host_key | grep <span style="color:#c30">&#34;^ssh-rsa &#34;</span> &gt; id_rsa.pub</code></pre></div>
+<p>And add your public key to the authorized keys:</p>
+<div class="highlight"><pre style="background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-bash" data-lang="bash">vi /etc/dropbear-initramfs/authorized_keys</code></pre></div>
+<p>Make sure <code>dropbear</code> starts by toggling the <code>NO_START</code> value in
+<code>/etc/default/dropbear</code>.</p>
+<div class="highlight"><pre style="background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-text" data-lang="text">root@caliban:~# cat /etc/default/dropbear | grep ^NO_START
+NO_START=0</code></pre></div>
+<p>Finally configure <code>dropbear</code> to use a different Port than 22 in order to
+avoid getting the MITM warning, by changing the <code>DROPBEAR_OPTIONS</code> value
+in /etc/dropbear-initramfs/config:</p>
+<div class="highlight"><pre style="background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-text" data-lang="text">root@caliban:~# cat /etc/dropbear-initramfs/config | grep ^DROPBEAR_OPTIONS
+DROPBEAR_OPTIONS=&#34;-p 12345&#34;</code></pre></div>
+<p>You can then set up two entries in your <code>~/.ssh/config</code>:</p>
+<div class="highlight"><pre style="background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-text" data-lang="text">$ cat ~/.ssh/config
+Host *
+ServerAliveInterval 120
+
+Host unlock_caliban
+  Hostname 1.2.3.4
+  User root
+  Port 2222
+
+Host caliban
+  Hostname 1.2.3.4
+  Port 22</code></pre></div>
+<p>At this point I noticed, that only the third partition of both of the
+harddrives with the rpool were mounted. When mounting a boot
+partition, I found that there were systemd-boot configuration files,
+but they seemed to be autogenerated by Proxmox, whenever
+<code>pve-efiboot-tool refresh</code> was run. So I looked into
+<code>/usr/sbin/pve-efiboot-tool</code>, and followed the code until I came out in
+<code>/etc/kernel/postinst.d/zz-pve-efiboot</code>, which contains the code that
+generates the systemd-boot configuration files:</p>
+<div class="highlight"><pre style="background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-bash" data-lang="bash"><span style="color:#09f;font-style:italic"># [...]</span>
+<span style="color:#069;font-weight:bold">for</span> kver in <span style="color:#a00">${</span><span style="color:#033">BOOT_KVERS</span><span style="color:#a00">}</span>; <span style="color:#069;font-weight:bold">do</span>
+
+    <span style="color:#033">linux_image</span><span style="color:#555">=</span><span style="color:#c30">&#34;/boot/vmlinuz-</span><span style="color:#a00">${</span><span style="color:#033">kver</span><span style="color:#a00">}</span><span style="color:#c30">&#34;</span>
+    <span style="color:#033">initrd</span><span style="color:#555">=</span><span style="color:#c30">&#34;/boot/initrd.img-</span><span style="color:#a00">${</span><span style="color:#033">kver</span><span style="color:#a00">}</span><span style="color:#c30">&#34;</span>
+
+    <span style="color:#069;font-weight:bold">if</span> <span style="color:#555">[</span> ! -f <span style="color:#c30">&#34;</span><span style="color:#a00">${</span><span style="color:#033">linux_image</span><span style="color:#a00">}</span><span style="color:#c30">&#34;</span> <span style="color:#555">]</span>; <span style="color:#069;font-weight:bold">then</span>
+        warn <span style="color:#c30">&#34;No linux-image </span><span style="color:#a00">${</span><span style="color:#033">linux_image</span><span style="color:#a00">}</span><span style="color:#c30"> found - skipping&#34;</span>
+        <span style="color:#069;font-weight:bold">continue</span>
+    <span style="color:#069;font-weight:bold">fi</span>
+    <span style="color:#069;font-weight:bold">if</span> <span style="color:#555">[</span> ! -f <span style="color:#c30">&#34;</span><span style="color:#a00">${</span><span style="color:#033">initrd</span><span style="color:#a00">}</span><span style="color:#c30">&#34;</span> <span style="color:#555">]</span>; <span style="color:#069;font-weight:bold">then</span>
+        warn <span style="color:#c30">&#34;No initrd-image </span><span style="color:#a00">${</span><span style="color:#033">initrd</span><span style="color:#a00">}</span><span style="color:#c30"> found - skipping&#34;</span>
+        <span style="color:#069;font-weight:bold">continue</span>
+    <span style="color:#069;font-weight:bold">fi</span>
+
+    warn <span style="color:#c30">&#34;  Copying kernel and creating boot-entry for </span><span style="color:#a00">${</span><span style="color:#033">kver</span><span style="color:#a00">}</span><span style="color:#c30">&#34;</span>
+    <span style="color:#033">KERNEL_ESP_DIR</span><span style="color:#555">=</span><span style="color:#c30">&#34;</span><span style="color:#a00">${</span><span style="color:#033">PMX_ESP_DIR</span><span style="color:#a00">}</span><span style="color:#c30">/</span><span style="color:#a00">${</span><span style="color:#033">kver</span><span style="color:#a00">}</span><span style="color:#c30">&#34;</span>
+    <span style="color:#033">KERNEL_LIVE_DIR</span><span style="color:#555">=</span><span style="color:#c30">&#34;</span><span style="color:#a00">${</span><span style="color:#033">esp</span><span style="color:#a00">}</span><span style="color:#c30">/</span><span style="color:#a00">${</span><span style="color:#033">KERNEL_ESP_DIR</span><span style="color:#a00">}</span><span style="color:#c30">&#34;</span>
+    mkdir -p <span style="color:#c30">&#34;</span><span style="color:#a00">${</span><span style="color:#033">KERNEL_LIVE_DIR</span><span style="color:#a00">}</span><span style="color:#c30">&#34;</span>
+    cp -u --preserve<span style="color:#555">=</span>timestamps <span style="color:#c30">&#34;</span><span style="color:#a00">${</span><span style="color:#033">linux_image</span><span style="color:#a00">}</span><span style="color:#c30">&#34;</span> <span style="color:#c30">&#34;</span><span style="color:#a00">${</span><span style="color:#033">KERNEL_LIVE_DIR</span><span style="color:#a00">}</span><span style="color:#c30">/&#34;</span>
+    cp -u --preserve<span style="color:#555">=</span>timestamps <span style="color:#c30">&#34;</span><span style="color:#a00">${</span><span style="color:#033">initrd</span><span style="color:#a00">}</span><span style="color:#c30">&#34;</span> <span style="color:#c30">&#34;</span><span style="color:#a00">${</span><span style="color:#033">KERNEL_LIVE_DIR</span><span style="color:#a00">}</span><span style="color:#c30">/&#34;</span>
+
+    <span style="color:#09f;font-style:italic"># create loader entry</span>
+    cat &gt; <span style="color:#c30">&#34;</span><span style="color:#a00">${</span><span style="color:#033">esp</span><span style="color:#a00">}</span><span style="color:#c30">/loader/entries/proxmox-</span><span style="color:#a00">${</span><span style="color:#033">kver</span><span style="color:#a00">}</span><span style="color:#c30">.conf&#34;</span> <span style="color:#c30">&lt;&lt;- EOF
+</span><span style="color:#c30">            title    ${LOADER_TITLE}
+</span><span style="color:#c30">            version  ${kver}
+</span><span style="color:#c30">            options  ${CMDLINE}
+</span><span style="color:#c30">            linux    /${KERNEL_ESP_DIR}/vmlinuz-${kver}
+</span><span style="color:#c30">            initrd   /${KERNEL_ESP_DIR}/initrd.img-${kver}
+</span><span style="color:#c30">    EOF</span>
+<span style="color:#069;font-weight:bold">done</span>
+<span style="color:#09f;font-style:italic"># [...]</span></code></pre></div>
+<p>For us, the cat part is especially interesting: the <code>CMDLINE</code> variable
+in the line beginning with &ldquo;<code>options</code>&rdquo; contains the boot options for the
+Linux kernel. This variable is assigned in the same file:</p>
+<div class="highlight"><pre style="background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-bash" data-lang="bash"><span style="color:#09f;font-style:italic"># [...]</span>
+<span style="color:#069;font-weight:bold">if</span> <span style="color:#555">[</span> -f /etc/kernel/cmdline <span style="color:#555">]</span>; <span style="color:#069;font-weight:bold">then</span>
+  <span style="color:#033">CMDLINE</span><span style="color:#555">=</span><span style="color:#c30">&#34;</span><span style="color:#069;font-weight:bold">$(</span>cat /etc/kernel/cmdline<span style="color:#069;font-weight:bold">)</span><span style="color:#c30">&#34;</span>
+<span style="color:#069;font-weight:bold">else</span>
+  warn <span style="color:#c30">&#34;No /etc/kernel/cmdline found - falling back to /proc/cmdline&#34;</span>
+  <span style="color:#033">CMDLINE</span><span style="color:#555">=</span><span style="color:#c30">&#34;</span><span style="color:#069;font-weight:bold">$(</span>cat /proc/cmdline<span style="color:#069;font-weight:bold">)</span><span style="color:#c30">&#34;</span>
+<span style="color:#069;font-weight:bold">fi</span>
+<span style="color:#09f;font-style:italic"># [...]</span></code></pre></div>
+<p>Apparently <code>/etc/kernel/cmdline</code> is the place where Proxmox stores it&rsquo;s
+boot options. The file contains one single line:</p>
+<div class="highlight"><pre style="background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-text" data-lang="text">root=ZFS=rpool/ROOT/pve-1 boot=zfs</code></pre></div>
+<p>After finding the <code>/etc/kernel/cmdline</code> file, I did a bit of searching
+and according to the Proxmox <a href="https://pve.proxmox.com/pve-docs/pve-admin-guide.html#sysboot%5Fedit%5Fkernel%5Fcmdline">documentation</a>, it is actually the
+apropriate file to change in this case.</p>
+
+<p>Now that we have identified the file we can use to configure our
+kernel options, there are two things we want to add:</p>
+
+<ol>
+<li><p>we want to make sure the network interface comes up so that we can
+ssh into the initramfs, we will use the <code>ip</code> option for that. It uses
+the following format (look <a href="https://www.kernel.org/doc/Documentation/filesystems/nfs/nfsroot.txt">here</a> for further reading):</p>
+<div class="highlight"><pre style="background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-text" data-lang="text">  ip=&lt;client-ip&gt;:&lt;server-ip&gt;:&lt;gw-ip&gt;:&lt;netmask&gt;:&lt;hostname&gt;:&lt;device&gt;:&lt;autoconf&gt;:
+&lt;dns0-ip&gt;:&lt;dns1-ip&gt;:&lt;ntp0-ip&gt;:</code></pre></div>
+<p>I omitted everything after autoconf, something like this works for
+me:</p>
+<div class="highlight"><pre style="background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-text" data-lang="text">ip=1.2.3.4::1.2.3.1:255.255.255.0:caliban:enpXsY:none:</code></pre></div></li>
+
+<li><p>also we have to tell the kernel which devices the cryptodevices are
+that we want to unlock, which is done using the <code>cryptodevice</code> option
+(here we have to supply the PARTUUIDs for both of our harddrives):</p>
+<div class="highlight"><pre style="background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-text" data-lang="text">cryptdevice=UUID=XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX cryptdevice=UUID=YYYYYYYY-YYYY-YYYY-YYYY-YYYYYYYYYYYY</code></pre></div></li>
+</ol>
+
+<p>The whole content of <code>/etc/kernel/cmdline</code> looks like this:</p>
+<div class="highlight"><pre style="background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-text" data-lang="text">ip=1.2.3.4::1.2.3.1:255.255.255.0:caliban:enpXsY:none: cryptdevice=UUID=XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX cryptdevice=UUID=YYYYYYYY-YYYY-YYYY-YYYY-YYYYYYYYYYYY root=ZFS=rpool/ROOT/pve-1 boot=zfs</code></pre></div>
+<p>The last thing to do is to:</p>
+<div class="highlight"><pre style="background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-bash" data-lang="bash">update-initramfs -u -k all
+pve-efiboot-tool refresh</code></pre></div>
+<p>Now you should be able to reboot your machine and ssh into the
+busybox on the port you just configured for <code>dropbear</code>. From there
+you can unlock the drives by running something like
+this<label class="margin-toggle sidenote-number"></label><span class="sidenote"> You&rsquo;ll have to input it twice since you have two encrypted drives </span>:</p>
+<div class="highlight"><pre style="background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-text" data-lang="text">echo -n &#34;password&#34; &gt; /lib/cryptsetup/passfifo</code></pre></div>
+<p>Or:</p>
+<div class="highlight"><pre style="background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-text" data-lang="text">/lib/cryptsetup/askpass &#34;password: &#34; &gt; /lib/cryptsetup/passfifo</code></pre></div>
+<p>Or you can also use the <code>cryptroot-unlock</code> script that is preinstalled
+already, which also prompts you to enter the password twice.</p>
+
+<p>If you&rsquo;re lazy, you can also use put the following script into
+<code>/etc/initramfs-tools/hooks</code> and make it executable. I basically
+merged the above example of using <code>/lib/cryptsetup/askpass</code> with a
+version of a unlock script I had lying around, it looks like it
+might have been from this <a href="https://gist.github.com/gusennan/712d6e81f5cf9489bd9f">gist</a>. It asks you for a passphrase and
+then uses echo to write it into <code>/lib/cryptsetup/passfifo</code> twice
+(since I use 2 harddrives) with one second delay in between, then
+kills the session so the system can come up<label class="margin-toggle sidenote-number"></label><span class="sidenote"> I noticed, that /etc/motd, which contains instructions on how to unlock your drive is not displayed in the busybox session. </span>. You probably shouldn&rsquo;t use it, but it seems to work
+for me:</p>
+<div class="highlight"><pre style="background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-bash" data-lang="bash"><span style="color:#099">#!/bin/sh
+</span><span style="color:#099"></span>
+<span style="color:#033">PREREQ</span><span style="color:#555">=</span><span style="color:#c30">&#34;dropbear&#34;</span>
+
+prereqs<span style="color:#555">()</span> <span style="color:#555">{</span>
+    <span style="color:#366">echo</span> <span style="color:#c30">&#34;</span><span style="color:#033">$PREREQ</span><span style="color:#c30">&#34;</span>
+<span style="color:#555">}</span>
+
+<span style="color:#069;font-weight:bold">case</span> <span style="color:#c30">&#34;</span><span style="color:#033">$1</span><span style="color:#c30">&#34;</span> in
+    prereqs<span style="color:#555">)</span>
+        prereqs
+        <span style="color:#366">exit</span> <span style="color:#f60">0</span>
+        ;;
+<span style="color:#069;font-weight:bold">esac</span>
+
+. <span style="color:#c30">&#34;</span><span style="color:#a00">${</span><span style="color:#033">CONFDIR</span><span style="color:#a00">}</span><span style="color:#c30">/initramfs.conf&#34;</span>
+. /usr/share/initramfs-tools/hook-functions
+
+<span style="color:#069;font-weight:bold">if</span> <span style="color:#555">[</span> <span style="color:#c30">&#34;</span><span style="color:#a00">${</span><span style="color:#033">DROPBEAR</span><span style="color:#a00">}</span><span style="color:#c30">&#34;</span> !<span style="color:#555">=</span> <span style="color:#c30">&#34;n&#34;</span> <span style="color:#555">]</span> <span style="color:#555">&amp;&amp;</span> <span style="color:#555">[</span> -r <span style="color:#c30">&#34;/etc/crypttab&#34;</span> <span style="color:#555">]</span> ; <span style="color:#069;font-weight:bold">then</span>
+
+    cat &gt; <span style="color:#c30">&#34;</span><span style="color:#a00">${</span><span style="color:#033">DESTDIR</span><span style="color:#a00">}</span><span style="color:#c30">/bin/unlock&#34;</span> <span style="color:#c30">&lt;&lt; EOF
+</span><span style="color:#c30">#!/bin/sh
+</span><span style="color:#c30">unlock_devices() {
+</span><span style="color:#c30">  pw=&#34;\$(/lib/cryptsetup/askpass &#34;password: &#34;)&#34;
+</span><span style="color:#c30">  echo -n \$pw &gt; /lib/cryptsetup/passfifo
+</span><span style="color:#c30">  sleep 1
+</span><span style="color:#c30">  echo -n \$pw &gt; /lib/cryptsetup/passfifo
+</span><span style="color:#c30">}
+</span><span style="color:#c30">if unlock_devices; then
+</span><span style="color:#c30"># kill \`ps | grep cryptroot | grep -v &#34;grep&#34; | awk &#39;{print \$1}&#39;\`
+</span><span style="color:#c30"># following line kill the remote shell right after the passphrase has
+</span><span style="color:#c30"># been entered.
+</span><span style="color:#c30">kill -9 \`ps | grep &#34;\-sh&#34; | grep -v &#34;grep&#34; | awk &#39;{print \$1}&#39;\`
+</span><span style="color:#c30">exit 0
+</span><span style="color:#c30">fi
+</span><span style="color:#c30">exit 1
+</span><span style="color:#c30">EOF</span>
+
+    chmod <span style="color:#f60">755</span> <span style="color:#c30">&#34;</span><span style="color:#a00">${</span><span style="color:#033">DESTDIR</span><span style="color:#a00">}</span><span style="color:#c30">/bin/unlock&#34;</span>
+
+    mkdir -p <span style="color:#c30">&#34;</span><span style="color:#a00">${</span><span style="color:#033">DESTDIR</span><span style="color:#a00">}</span><span style="color:#c30">/lib/unlock&#34;</span>
+    cat &gt; <span style="color:#c30">&#34;</span><span style="color:#a00">${</span><span style="color:#033">DESTDIR</span><span style="color:#a00">}</span><span style="color:#c30">/lib/unlock/plymouth&#34;</span> <span style="color:#c30">&lt;&lt; EOF
+</span><span style="color:#c30">#!/bin/sh
+</span><span style="color:#c30">[ &#34;\$1&#34; == &#34;--ping&#34; ] &amp;&amp; exit 1
+</span><span style="color:#c30">/bin/plymouth &#34;\$@&#34;
+</span><span style="color:#c30">EOF</span>
+
+    chmod <span style="color:#f60">755</span> <span style="color:#c30">&#34;</span><span style="color:#a00">${</span><span style="color:#033">DESTDIR</span><span style="color:#a00">}</span><span style="color:#c30">/lib/unlock/plymouth&#34;</span>
+
+    <span style="color:#366">echo</span> To unlock root-partition run <span style="color:#c30">&#34;unlock&#34;</span> &gt;&gt; <span style="color:#a00">${</span><span style="color:#033">DESTDIR</span><span style="color:#a00">}</span>/etc/motd
+<span style="color:#069;font-weight:bold">fi</span></code></pre></div>
+<p>That&rsquo;s pretty much all of it, you can now start enjoying remote
+reboots on your freshly encrypted Proxmox host.</p>
+
+  </div>
+
+  <div id=links>
+    
+    
+  </div>
+</section>
+
+</body>
+</html>
+
+
+
