@@ -5,7 +5,7 @@
 		<description>Recent content on tactical-documentation</description>
 		<generator>Hugo 0.57.2 -- gohugo.io</generator>
 		<language>en-us</language>
-		<lastBuildDate>Tue, 27 Aug 2019 10:45:18 +0000</lastBuildDate>
+		<lastBuildDate>Wed, 28 Aug 2019 23:02:26 +0000</lastBuildDate>
 		<atom:link href="https://tactical-documentation.github.io/index.xml" rel="self" type="application/rss+xml" />
 			
 			
@@ -368,5 +368,915 @@ reboots on your freshly encrypted Proxmox host.&lt;/p&gt;
 </description>
 			</item>
 			
+			
+			<item>
+				<title>Proof of Concept: Adding Boot Environments to Proxmox VE 6</title>
+				<link>https://tactical-documentation.github.io/post/poc-proxmox-and-boot-environments/</link>
+				<pubDate>Wed, 28 Aug 2019 00:00:00 +0000</pubDate>
+				<guid>https://tactical-documentation.github.io/post/poc-proxmox-and-boot-environments/</guid>
+				<description>
+
+&lt;p&gt;Dear Reader, this time I would like to invite you onto a small
+journey: To boldly go where no man has gone
+before&lt;label class=&#34;margin-toggle sidenote-number&#34;&gt;&lt;/label&gt;&lt;span class=&#34;sidenote&#34;&gt; Alright, that&amp;rsquo;s not true, but I think it&amp;rsquo;s the first time someone documents this kind of thing in the context of Proxmox &lt;/span&gt;. We&amp;rsquo;re about to embark on a journey to make your Proxmox
+host quite literally immortal. Also since what we are essentially
+doing here is only a Proof of concept, you probably shouldn&amp;rsquo;t use it
+in production, but as it&amp;rsquo;s really amazing, so you might want to try
+it out in a test environment.&lt;/p&gt;
+
+&lt;p&gt;In this article we are going to take a closer look at how Proxmox
+sets up the &lt;code&gt;ESP&lt;/code&gt; &lt;label class=&#34;margin-toggle sidenote-number&#34;&gt;&lt;/label&gt;&lt;span class=&#34;sidenote&#34;&gt; EFI Systems Partition &lt;/span&gt; for
+&lt;code&gt;systemd-boot&lt;/code&gt; and how we can adapt this process to support &lt;code&gt;boot
+   environments&lt;/code&gt;. Also this is going to be a long one, so you might want
+to grab a cup of coffee and some snacks to eat &lt;/label&gt;&lt;span class=&#34;marginnote&#34;&gt; And maybe start installing a Proxmox VE 6 VM with ZFS, because if boot environments are still new to you, at the point when you&amp;rsquo;ve read about halfway through this post, you will be eager to get your hands dirty and try this out for yourself &lt;/span&gt;.&lt;/p&gt;
+
+&lt;h2 id=&#34;overview&#34;&gt;Overview&lt;/h2&gt;
+
+&lt;ul&gt;
+&lt;li&gt;What are Boot Environments?
+
+&lt;ul&gt;
+&lt;li&gt;Boot Environments on Linux&lt;/li&gt;
+&lt;/ul&gt;&lt;/li&gt;
+&lt;li&gt;Poking around in Proxmox
+
+&lt;ul&gt;
+&lt;li&gt;The Proxmox ZFS Layout&lt;/li&gt;
+&lt;li&gt;The Boot Preparation&lt;/li&gt;
+&lt;li&gt;A Simple Proof of Concept&lt;/li&gt;
+&lt;/ul&gt;&lt;/li&gt;
+&lt;li&gt;From one Proof of Concept to Another
+
+&lt;ul&gt;
+&lt;li&gt;Sidenote: The Proxmox ESP Size&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;zedenv&lt;/code&gt;: A Boot Environment Manager&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;systemd-boot&lt;/code&gt; and the EFI System Partitions&lt;/li&gt;
+&lt;li&gt;Making &lt;code&gt;zedenv&lt;/code&gt; and Proxmox play well together&lt;/li&gt;
+&lt;/ul&gt;&lt;/li&gt;
+&lt;li&gt;Conclusion and Future Work&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;h2 id=&#34;what-are-boot-environments&#34;&gt;What are Boot Environments?&lt;/h2&gt;
+
+&lt;p&gt;Boot environments are a truly amazing feature, which originated
+somewhere in the Solaris/Illumos ecosystem&lt;label class=&#34;margin-toggle sidenote-number&#34;&gt;&lt;/label&gt;&lt;span class=&#34;sidenote&#34;&gt; They have literally been around for ages, I&amp;rsquo;m not quite sure at which point in time they were introduced, but you can finde evidence &lt;a href=&#34;https://books.google.com/books?id=8vrwjLsPkgwC&amp;amp;pg=PA109&#34;&gt;at archeological digsites&lt;/a&gt; dating them back to at least 2003. &lt;/span&gt; and
+has since been adapted by other operating systems, such as FreeBSD,
+DragonflyBSD and others. The concept is actually quite simple:&lt;/p&gt;
+
+&lt;blockquote&gt;
+&lt;p&gt;A boot environment is a bootable Oracle Solaris environment
+consisting of a root dataset and, optionally, other datasets
+mounted underneath it. Exactly one boot environment can be active
+at a time.&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;&lt;a href=&#34;https://docs.oracle.com/cd/E23824%5F01/html/E21801/index.html&#34;&gt;Oracle Solaris 11 Information Library&lt;/a&gt;&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/blockquote&gt;
+
+&lt;p&gt;In my own words, I would describe boot environments as snapshots of
+a [partial] system, which can booted from (that is when a Boot
+Environment is active) or be mounted at runtime (by the same
+system).&lt;/p&gt;
+
+&lt;p&gt;This enables a bunch of very interesting use-cases:&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;Rollbacks: This might not seem to be a pretty back deal at first,
+but once you realize that even after a major OS version upgrade,
+when something is suddenly broken, the previous version is just a
+reboot away.&lt;/li&gt;
+&lt;li&gt;You can create bootable system snapshots on your bare metal
+machines, not only on your virtual machines.&lt;/li&gt;
+&lt;li&gt;You can choose between creating a new boot environment to save
+the current systems state before updating or create a new boot
+environment, chroot into it, upgrade and reboot into a freshly
+upgraded system.&lt;/li&gt;
+&lt;li&gt;You can quite literally take your work home if you like, by
+creating a boot environment and *&lt;strong&gt;&lt;em&gt;drum-roll&lt;/em&gt;&lt;/strong&gt;* taking it home. You
+you can of course also use this in order to create a virtual
+machine, container, jail or zone of your system in order to test
+something new or for forensic purposes.&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;p&gt;Are you hooked yet? Good, you really should be. If you&amp;rsquo;re not
+hooked, read till the end of the next section, you will
+be. &lt;/label&gt;&lt;span class=&#34;marginnote&#34;&gt; If you&amp;rsquo;re interested in boot environments, I would suggest, you take a look at vermadens &lt;a href=&#34;https://vermaden.files.wordpress.com/2018/07/pbug-zfs-boot-environments-2018-07-30.pdf&#34;&gt;presentation on ZFS boot environments&lt;/a&gt;, or generally searching a bit on the web for articles about Boot Environments on other unix systems, particularly there is quite a bit to be read on FreeBSD, which recently adopted them and which is far more in depth and better explained than what I&amp;rsquo;ll probably write down here. &lt;/span&gt;&lt;/p&gt;
+
+&lt;h3 id=&#34;boot-environments-on-linux&#34;&gt;Boot Environments on Linux&lt;/h3&gt;
+
+&lt;p&gt;While other operating systems have happily adapted boot
+environments, there is surprisingly&lt;label class=&#34;margin-toggle sidenote-number&#34;&gt;&lt;/label&gt;&lt;span class=&#34;sidenote&#34;&gt; Or maybe not so surprisingly, if you remember how long zones and jails have been a thing, while linux just recently started doing containers. At least there&amp;rsquo;s still Windows to compare with. &lt;/span&gt; apparently not
+too much going on in the linux world. The focus here seems to be
+more on containerizing applications in order to isolate them from
+the rest of the host system rather than to make the host system
+itself more solid (which is also great, but not the same).&lt;/p&gt;
+
+&lt;p&gt;On linux there are presently - at least to my knowledge - only the
+following projects that aim in a similiar direction:&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;There is &lt;a href=&#34;https://en.opensuse.org/openSUSE:Snapper%5FTutorial&#34;&gt;snapper&lt;/a&gt; for &lt;code&gt;btrfs&lt;/code&gt;, which seems to be a quite Suse
+specific solution. However according to it&amp;rsquo;s documentation:
+&lt;a href=&#34;https://www.suse.com/documentation/sles-15/book%5Fsle%5Fadmin/data/sec%5Fsnapper%5Fsnapshot-boot.html#sec%5Fsnapper%5Fsnapshot-boot%5Flimits&#34;&gt;&amp;ldquo;A
+complete system rollback, restoring the complete system to the
+identical state as it was in when a snapshot was taken, is not
+possible.&amp;rdquo;&lt;/a&gt; This, at least without more explanation or context
+sounds quite a bit spooky.&lt;/li&gt;
+&lt;li&gt;There is a &lt;a href=&#34;https://github.com/b333z/beadm&#34;&gt;Linux port&lt;/a&gt; of the FreeBSD beadm tool, which hasn&amp;rsquo;t
+been updated in ~3 years, while beadm has. It does not seem to
+be maintained any more and to be tailored to a single gentoo
+installation.&lt;/li&gt;
+&lt;li&gt;There are a few &lt;code&gt;btrfs&lt;/code&gt; specific scripts by a company called
+&lt;a href=&#34;https://github.com/PluribusNetworks/pluribus%5Flinux%5Fuserland/tree/master/components/bootenv-tools/bootenv-tools-src&#34;&gt;Pluribus Networks&lt;/a&gt;, which seem to have implemented their own
+version of &lt;code&gt;beadm&lt;/code&gt; on top of &lt;code&gt;btrfs&lt;/code&gt;. This apparently runs on some
+network devices.&lt;/li&gt;
+&lt;li&gt;&lt;a href=&#34;https://nixos.org/&#34;&gt;NixOS&lt;/a&gt; does something similiar to boot environments with their
+atomic update and rollback feature, but as far as I&amp;rsquo;ve
+understood this is still different from boot environments. Being
+functional, they don&amp;rsquo;t exactly roll back to a old version of the
+system based on a filesystem snapshot, but rather recreate an
+identical environment to a previous one.&lt;/li&gt;
+&lt;li&gt;And finally there is &lt;a href=&#34;https://github.com/johnramsden/zedenv&#34;&gt;zedenv&lt;/a&gt;, a boot environment manager that is
+written in python, supports both Linux and Freebsd and works
+really nice. It&amp;rsquo;s also the one that I&amp;rsquo;ve used before. It is also
+what we are going to use here, since there really isn&amp;rsquo;t an
+alternative when it comes to linux and ZFS.&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;h2 id=&#34;poking-around-in-proxmox&#34;&gt;Poking around in Proxmox&lt;/h2&gt;
+
+&lt;p&gt;But before we start grabbing a copy of &lt;code&gt;zedenv&lt;/code&gt;, we have to take a
+closer look into Proxmox itself in order to look at what we may
+have to adapt.&lt;/p&gt;
+
+&lt;p&gt;Basically we already know that it is generally possible to use boot
+environments with ZFS and linux, so what we want is hopefully not
+exactly rocket science.&lt;/p&gt;
+
+&lt;p&gt;What we are going to check is:&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;How do we have to adapt the Proxmox VE 6 rpool?&lt;/li&gt;
+&lt;li&gt;How does Proxmox prepare the boot process and what do we have to
+tweak to make it boot into a boot environment?&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;h3 id=&#34;the-proxmox-zfs-layout&#34;&gt;The Proxmox ZFS layout&lt;/h3&gt;
+
+&lt;p&gt;In this part we are going to take a look at how the ZFS layout is
+set up by the proxmox installer. This is because there&amp;rsquo;s a few
+things we have to consider when we use boot environments with
+Proxmox:&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;We do not ever want to interfere in the operation of our guest
+machines: Since we have the ability to snapshot and restore
+virtual machines and containers, there is really no benefit to
+include them into the snapshots of our boot environments, on
+the contrary, we really don&amp;rsquo;t want to end up with guests of our
+tenants missing files just because we&amp;rsquo;ve made a rollback.&lt;/li&gt;
+&lt;li&gt;Is the ZFS layout compatible with running boot environments? Not
+all systems with ZFS are automatically compatible with using Boot
+Environments, basically if you just mount your ZFS pool as &lt;code&gt;/&lt;/code&gt;, it
+won&amp;rsquo;t work&lt;/li&gt;
+&lt;li&gt;Are there any directories we have to exclude from the root
+dataset?&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;p&gt;So lets look at Proxmox:
+By default after installing with ZFS root you get a pool called
+&lt;code&gt;rpool&lt;/code&gt; which is split up into &lt;code&gt;rpool/ROOT&lt;/code&gt; as well as &lt;code&gt;rpool/data&lt;/code&gt; and
+looks similiar to this (&lt;code&gt;zfs list&lt;/code&gt;):&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;rpool                         4.28G   445G      104K  /rpool
+rpool/ROOT                    2.43G   445G       96K  /rpool/ROOT
+rpool/ROOT/pve-1              2.43G   445G     2.43G  /
+rpool/data                    1.84G   445G      104K  /rpool/data
+rpool/data/subvol-101-disk-0   831M  7.19G      831M  /rpool/data/subvol-101-disk-0
+rpool/data/vm-100-disk-0      1.03G   445G     1.03G  -&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;&lt;code&gt;rpool/data&lt;/code&gt; contains the virtual machines as well as the containers
+as you can see in the output of &lt;code&gt;zfs list&lt;/code&gt; above. That&amp;rsquo;s great, we
+don&amp;rsquo;t have to manually move them. This takes care of the second
+point of our checklist from above.&lt;/p&gt;
+
+&lt;p&gt;Also &lt;code&gt;rpool/ROOT/pve-1&lt;/code&gt; is mounted as &lt;code&gt;/&lt;/code&gt;, so we have &lt;code&gt;rpool/ROOT&lt;/code&gt; which
+can potentially hold more than one snapshot of &lt;code&gt;/&lt;/code&gt;, that is actually
+exactly what we need in order to use boot environments, the
+Proxmox team just saved us a bunch of time!&lt;/p&gt;
+
+&lt;p&gt;This only leaves the third part of our little checklist open. Which
+directories are left that we don&amp;rsquo;t want to snapshot as part of our
+boot environments? We can find a pretty important one in this
+context by checking &lt;code&gt;/etc/pve/storage.cfg&lt;/code&gt;:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;dir: local
+        path /var/lib/vz
+        content iso,vztmpl,backup
+
+zfspool: local-zfs
+        pool rpool/data
+        sparse
+        content images,rootdir&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;So while the virtual machines and the containers are part of
+&lt;code&gt;rpool/data&lt;/code&gt;, iso files, templates and backups are still located in
+&lt;code&gt;rpool/root/pve-1&lt;/code&gt;. That&amp;rsquo;s not really what we want, imagine rolling
+back to a Boot Environment from a week ago and suddenly missing a
+weeks worth of Backups, that would be pretty annoying. Iso files
+as well as container templates are probably not worth keeping in
+our boot environments either.&lt;/p&gt;
+
+&lt;p&gt;So lets take &lt;code&gt;/var/lib/vz&lt;/code&gt; out of &lt;code&gt;rpool/root/pve-1&lt;/code&gt;, first create a
+new zvol:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;root@caliban:/var/lib# zfs create -o mountpoint=/var/lib/vz rpool/vz
+cannot mount &amp;#39;/var/lib/vz&amp;#39;: directory is not empty&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;Then move over the content of &lt;code&gt;/var/lib/vz&lt;/code&gt; into the newly created
+and not yet mounted zvol:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;mv /var/lib/vz/ vz.old/ &amp;amp;&amp;amp; zfs mount rpool/vz &amp;amp;&amp;amp; mv vz.old/* /var/lib/vz/ &amp;amp;&amp;amp; rmdir vz.old&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;If you don&amp;rsquo;t have any images, templates or backups yet, or you just
+don&amp;rsquo;t particularly care about them, you can of course also just
+remove &lt;code&gt;/var/lib/vz/*&lt;/code&gt; entirely, mount &lt;code&gt;rpool/vz&lt;/code&gt; and recreate the
+folder structure:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;root@caliban:~# tree -a /var/lib/vz/
+/var/lib/vz/
+├── dump
+└── template
+    ├── cache
+    ├── iso
+    └── qemu&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;Ok, now that&amp;rsquo;s out of the way, we should in general be able to make
+snapshots, roll them back without disturbing the operation of the
+proxmox server too much.&lt;/p&gt;
+
+&lt;p&gt;&lt;strong&gt;BUT&lt;/strong&gt;: this might not apply to your server, since there is still a
+lot of other stuff in &lt;code&gt;/var/lib/&lt;/code&gt; that you may want to include or
+exclude from snapshots! Better be sure to check what&amp;rsquo;s in there.&lt;/p&gt;
+
+&lt;p&gt;Also there are some other directories we might want to
+exclude. There is for example &lt;code&gt;/tmp&lt;/code&gt; as well as &lt;code&gt;/var/tmp/&lt;/code&gt; which
+shouldn&amp;rsquo;t include anything that is worth keeping, but which of
+course would be snapshotted as well, we can create zvols for them
+as well and they should be automounted on reboot:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;zfs create -o mountpoint=/tmp     rpool/tmp
+zfs create -o mountpoint=/var/tmp rpool/var_tmp&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;If you&amp;rsquo;ve users that can connect directly to your Proxmox host,
+you might want to exclude &lt;code&gt;/home/&lt;/code&gt; as well. &lt;code&gt;/root/&lt;/code&gt; might be another
+good candidate, you may want to keep all of your shell history
+available at all times and regardless of which snapshot you&amp;rsquo;re
+currently in. You can also think about whether or not you want to
+have your logs, mail and proabably a bunch of other things
+included or excluded, I guess both variants have their use cases.&lt;/p&gt;
+
+&lt;p&gt;On my system &lt;code&gt;zfs list&lt;/code&gt; returns something like this:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;NAME                           USED  AVAIL     REFER  MOUNTPOINT
+rpool                         5.25G   444G      104K  /rpool
+rpool/ROOT                    1.34G   444G       96K  /rpool/ROOT
+rpool/ROOT/pve-1              1.30G   444G     1.16G  /
+rpool/data                    2.59G   444G      104K  /rpool/data
+rpool/home_root               7.94M   444G     7.94M  /root
+rpool/tmp                      128K   444G      128K  /tmp
+rpool/var_tmp                  136K   444G      136K  /var/tmp
+rpool/vz                      1.30G   444G     1.30G  /var/lib/vz&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;At this point we&amp;rsquo;ve made sure that:&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;the Proxmox ZFS layout is indeed compatible with Boot
+Environments pretty much out of the box&lt;/li&gt;
+&lt;li&gt;we moved the directories that might impact day to day operations
+out of what we want to snapshot&lt;/li&gt;
+&lt;li&gt;we also excluded a few more directories, which is optional&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;h3 id=&#34;the-boot-preparation&#34;&gt;The Boot Preparation&lt;/h3&gt;
+
+&lt;p&gt;So after we&amp;rsquo;ve made sure that our ZFS layout works in this step we
+have to take a closer look at how the boot process is prepared in
+Proxmox. That is because as you might have noticed Proxmox does
+this a bit different from what you might be used to from other
+linux systems.&lt;/p&gt;
+
+&lt;p&gt;As an example this is what &lt;code&gt;lsblk&lt;/code&gt; looks like on my local machine:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;nvme0n1           259:0    0  477G  0 disk
+├─nvme0n1p1       259:1    0    2G  0 part  /boot/efi
+└─nvme0n1p2       259:2    0  475G  0 part
+  └─crypt         253:0    0  475G  0 crypt
+    ├─system-swap 253:1    0   16G  0 lvm   [SWAP]
+    └─system-root 253:2    0  100G  0 lvm   /&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;And this is &lt;code&gt;lsblk&lt;/code&gt; on Proxmox:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;sda               8:0    0 465.8G  0 disk
+├─sda1            8:1    0  1007K  0 part
+├─sda2            8:2    0   512M  0 part
+└─sda3            8:3    0 465.3G  0 part
+  └─cryptrpool1 253:0    0 465.3G  0 crypt
+sdd               8:48   0 465.8G  0 disk
+├─sdd1            8:49   0  1007K  0 part
+├─sdd2            8:50   0   512M  0 part
+└─sdd3            8:51   0 465.3G  0 part
+  └─cryptrpool2 253:1    0 465.3G  0 crypt&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;Notice how there is no mounted EFI Systems Partition? That&amp;rsquo;s
+because both&lt;label class=&#34;margin-toggle sidenote-number&#34;&gt;&lt;/label&gt;&lt;span class=&#34;sidenote&#34;&gt; Actually the UUIDs of all used ESP Partitions are stored in /etc/kernel/pve-efiboot-uuids &lt;/span&gt; of the
+/dev/sdX2 devices, which are involved holding my mirrored &lt;code&gt;proot&lt;/code&gt;
+pool contain a valid ESP. Also proxmox does not mount these
+partitions by default but rather encurages the use of their
+&lt;code&gt;pve-efiboot-tool&lt;/code&gt;, which then takes care of putting a valid boot
+configuration on all involved drives, so you can boot off any of
+them.&lt;/p&gt;
+
+&lt;p&gt;This is not at all bad design, on the contrary, it is however
+noteworthy, because it bit it is different from what other systems
+with boot environments are using.&lt;/p&gt;
+
+&lt;p&gt;Here is a quick recap on how in Proxmox the boot process is
+prepared:&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;Initially something happens that requires an update of the
+bootloader configuration (e.g. a new kernel is installed or
+you&amp;rsquo;ve just set up an full disk encryption, changed something
+in the initramfs)&lt;/li&gt;
+&lt;li&gt;This leads to &lt;code&gt;/usr/sbin/pve-efiboot-tool refresh&lt;/code&gt; being run
+(either automated or manually), which at some point executes
+&lt;code&gt;/etc/kernel/postinst.d/zz-pve-efiboot&lt;/code&gt;, which is the script that
+loops over the ESPs (which are defined by their UUID in
+&lt;code&gt;/etc/kernel/pve-efiboot-uuids&lt;/code&gt;), mounts them and generates the
+boot loader configuration on them according to what Proxmox (or
+you as the user) has &lt;a href=&#34;https://pve.proxmox.com/wiki/Host%5FBootloader&#34;&gt;defined as kernel versions to keep&lt;/a&gt;. The
+bootloader configuration is created for every kernel and
+configured with the kernel commandline options from
+&lt;code&gt;/etc/kernel/cmdline&lt;/code&gt;.&lt;/li&gt;
+&lt;li&gt;On reboot you can use any harddrive that holds a EFI System
+Partition to boot from.&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;p&gt;Incidentally the &lt;code&gt;/etc/kernel/cmdline&lt;/code&gt; file is also the one we
+configured in the previous post in order to enable remote
+decryption on a fully encrypted Proxmox host. Apart from the the
+options we added to it last time, it also contains another very
+interesting one:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;root=ZFS=rpool/ROOT/pve-1&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;h3 id=&#34;a-simple-proof-of-concept&#34;&gt;A Simple Proof of Concept&lt;/h3&gt;
+
+&lt;p&gt;At this point we already have everything we need:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;zfs snapshot rpool/ROOT/pve-1@test
+zfs clone rpool/ROOT/pve-1@test rpool/ROOT/pve-2
+zfs &lt;span style=&#34;color:#366&#34;&gt;set&lt;/span&gt; &lt;span style=&#34;color:#033&#34;&gt;mountpoint&lt;/span&gt;&lt;span style=&#34;color:#555&#34;&gt;=&lt;/span&gt;/ rpool/ROOT/pve-2
+sed -i &lt;span style=&#34;color:#c30&#34;&gt;&amp;#39;s/pve-1/pve-2/&amp;#39;&lt;/span&gt; /etc/kernel/cmdline
+pve-efiboot-tool refresh
+reboot&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;Tadaa!&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;root@caliban:~# mount | grep rpool
+rpool/ROOT/pve-2 on / type zfs (rw,relatime,xattr,noacl)rpool on /rpool type zfs (rw,noatime,xattr,noacl)rpool/var_tmp on /var/tmp type zfs (rw,noatime,xattr,noacl)rpool/home_root on /root type zfs (rw,noatime,xattr,noacl)
+rpool/tmp on /tmp type zfs (rw,noatime,xattr,noacl)
+rpool/vz on /var/lib/vz type zfs (rw,noatime,xattr,noacl)
+rpool/ROOT on /rpool/ROOT type zfs (rw,noatime,xattr,noacl)
+rpool/data on /rpool/data type zfs (rw,noatime,xattr,noacl)
+rpool/data/subvol-101-disk-0 on /rpool/data/subvol-101-disk-0 type zfs (rw,noatime,xattr,posixacl)&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;Congratulations, you&amp;rsquo;ve just created your first boot environment!
+If you&amp;rsquo;re not convinced yet, just install something such as &lt;code&gt;htop&lt;/code&gt;,
+enjoy the colors for a bit and run:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;sed -i &amp;#39;s/pve-2/pve-1/&amp;#39; /etc/kernel/cmdline
+pve-efiboot-tool refresh
+reboot&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;And finally try to run &lt;code&gt;htop&lt;/code&gt; again. Notice how it&amp;rsquo;s not only gone,
+in fact it was never even there in the first place, at least in
+from the systems point of view! Let that sink in for a moment. You
+want this. &lt;/label&gt;&lt;span class=&#34;marginnote&#34;&gt; At this point you might want to take a small break, grab another cup of coffee, lean back and remember this one time, back in the day when you were just getting started with all this operations stuff, it was almost beer o&amp;rsquo;clock and before going home you just wanted to apply this one tiny little update, which of course led to the whole server breaking. Remember how, when you were refilling your coffee cup for the third time this old solaris guru walked by on his way home and he had this mysterious smile on his face. Yeah, he knew you were about to spend half of the night there fixing the issue and reinstalling everything, in fact he probably had a similiar issue at the same day, but then decided to just roll back go home a bit early and take care of it the next day. &lt;/span&gt;&lt;/p&gt;
+
+&lt;h2 id=&#34;from-one-proof-of-concept-to-another&#34;&gt;From one Proof of Concept to Another&lt;/h2&gt;
+
+&lt;p&gt;So at this point we know how to set up a boot environment by hand,
+that&amp;rsquo;s nice, but currently we only can hop back and forth between a
+single boot environment, which is not cool enough yet.&lt;/p&gt;
+
+&lt;p&gt;We basically need some tooling which we can use to make everything
+work together nicely.&lt;/p&gt;
+
+&lt;p&gt;So in this section we are going to look into tooling as well as
+into how we may be able to make Proxmox play well together with the
+boot environment manager of our (only) choice &lt;code&gt;zedenv&lt;/code&gt;.&lt;/p&gt;
+
+&lt;p&gt;Our new objective is to look at what we need to do in order to
+enable us to select and start any number of boot environments from
+the boot manager.&lt;/p&gt;
+
+&lt;h3 id=&#34;sidenote-the-proxmox-esp-size&#34;&gt;Sidenote: The Proxmox ESP Size&lt;/h3&gt;
+
+&lt;p&gt;But first a tiny bit of math: since Proxmox uses systemd-boot, the
+kernel and initrd are stored in the EFI Systems Partition, which
+in a normal installation is 512MB in size. That should be enogh
+for the default case, where Proxmox stores only a hand full of
+kernels to boot from.&lt;/p&gt;
+
+&lt;p&gt;In our case however we might want to be able to access a higher
+number of kernels, so we can travel back in time in order to also
+start old boot environments.&lt;/p&gt;
+
+&lt;p&gt;A typical pair of kernel and initrd seems to be about 50MB in
+size, so we can currently store about 10 different kernels at a
+time.&lt;/p&gt;
+
+&lt;p&gt;If we want to increase the size of the ESP however we might be out
+of luck, since ZFS does not like to shrink, so if you&amp;rsquo;re in the
+situation of setting up a fresh Proxmox host, you might want to
+plug in a USB Stick (with less storage than your drives) or
+something similiar and create a mirrored ZFS RAID1 with this
+device and the other two drives which you really want to use for
+storage. This way the size of the resulting ZFS partition will be
+smaller than the drives you actually use and after the initial
+installation you can just:&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;Remove the small drive from &lt;code&gt;rpool&lt;/code&gt;&lt;/li&gt;
+&lt;li&gt;Remove the first normal drive from &lt;code&gt;rpool&lt;/code&gt;, delete the ZFS
+partition, increase the size of the ESP to whatever you want,
+recreate a ZFS partition and readd it to &lt;code&gt;rpool&lt;/code&gt;&lt;/li&gt;
+&lt;li&gt;wait until &lt;code&gt;rpool&lt;/code&gt; has resilvered the drive&lt;/li&gt;
+&lt;li&gt;repeat 2. and 3. with your second drive.&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;h3 id=&#34;zedenv-a-boot-environment-manager&#34;&gt;&lt;code&gt;zedenv&lt;/code&gt;: A Boot Environment Manager&lt;/h3&gt;
+
+&lt;p&gt;Now lets install &lt;code&gt;zedenv&lt;/code&gt; &lt;label class=&#34;margin-toggle sidenote-number&#34;&gt;&lt;/label&gt;&lt;span class=&#34;sidenote&#34;&gt; Be sure to read the &lt;a href=&#34;https://zedenv.readthedocs.io&#34;&gt;documentation&lt;/a&gt; at some point in time. Also check out &lt;a href=&#34;https://ramsdenj.com&#34;&gt;John Ramsdens blog&lt;/a&gt;, which contains a bit more info about zedenv, workint linux ZFS configuration and a bunch of other awesome stuff &lt;/span&gt;:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;root@caliban:~# apt install git python3-venv
+
+root@caliban:~# mkdir opt
+root@caliban:~# cd opt
+root@caliban:~# git clone https://github.com/johnramsden/pyzfscmds
+root@caliban:~# git clone https://github.com/johnramsden/zedenv
+
+root@caliban:~/opt# python3.7 -m venv zedenv-venv
+root@caliban:~/opt# . zedenv-venv/bin/activate
+(zedenv-venv) root@caliban:~/opt# cd pyzfscmds/
+(zedenv-venv) root@caliban:~/opt/pyzfscmds# python setup.py install
+(zedenv-venv) root@caliban:~/opt/pyzfscmds# cd ../zedenv
+(zedenv-venv) root@caliban:~/opt/zedenv# python setup.py install&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;Now &lt;code&gt;zedenv&lt;/code&gt; should be installed into our new &lt;code&gt;zedenv-venv&lt;/code&gt;:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;(zedenv-venv) root@caliban:~# zedenv --help
+Usage: zedenv [OPTIONS] COMMAND [ARGS]...
+  ZFS boot environment manager cli
+Options:  --version
+  --plugins  List available plugins.  --help     Show this message and exit.
+
+Commands:
+  activate  Activate a boot environment.  create    Create a boot environment.
+  destroy   Destroy a boot environment or snapshot.
+  get       Print boot environment properties.  list      List all boot environments.
+  mount     Mount a boot environment temporarily.
+  rename    Rename a boot environment.  set       Set boot environment properties.
+  umount    Unmount a boot environment.&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;As you can check &lt;code&gt;systemd-boot&lt;/code&gt; seems to be supported out of the box:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;(zedenv-venv) root@caliban:~# zedenv --plugins
+Available plugins:
+systemdboot&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;But since we are using Proxmox &lt;code&gt;systemd-boot&lt;/code&gt; and &lt;code&gt;zedenv&lt;/code&gt; are
+actually not really supported. Remember that Proxmox doesn&amp;rsquo;t
+actually mount the EFI System Partitions? Well &lt;code&gt;zedenv&lt;/code&gt; makes the
+assumption that there is only one ESP, and that it is mounted
+somewhere at all times.&lt;/p&gt;
+
+&lt;p&gt;Nonetheless, lets explore &lt;code&gt;zedenv&lt;/code&gt; a bit so you can see how using a
+boot environment manager looks like. Let&amp;rsquo;s &lt;code&gt;list&lt;/code&gt; the available boot
+environments:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;(zedenv-venv) root@caliban:~# zedenv list
+Name   Active   Mountpoint   Creation
+pve-1  NR       /            Mon-Aug-19-1:27-2019
+
+(zedenv-venv) root@caliban:~# zfs list -r rpool/ROOT
+NAME               USED  AVAIL     REFER  MOUNTPOINT
+rpool/ROOT        1.17G   444G       96K  /rpool/ROOT
+rpool/ROOT/pve-1  1.17G   444G     1.17G  /&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;Before we can create new boot environments, we have to outwit
+&lt;code&gt;zedenv&lt;/code&gt; on our Proxmox host: we have to set the bootloader to
+systemd-boot and due to the assumption that the ESP has to be
+mounted, we also have to make &lt;code&gt;zedenv&lt;/code&gt; believe that the ESP is
+mounted (&lt;code&gt;/tmp/efi&lt;/code&gt; is a reasonably sane path for this since we
+won&amp;rsquo;t be really using &lt;code&gt;zedenv&lt;/code&gt; to configure &lt;code&gt;systemd-boot&lt;/code&gt; here):&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;zedenv set org.zedenv:bootloader=systemdboot
+mkdir /tmp/efi
+zedenv set org.zedenv.systemdboot:esp=/tmp/efi&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;We can now &lt;code&gt;create&lt;/code&gt; new boot environments:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;(zedenv-venv) root@caliban:~# zedenv create default-000
+
+(zedenv-venv) root@caliban:~# zedenv list
+Name         Active   Mountpoint   Creation
+pve-1        NR       /            Mon-Aug-19-1:27-2019
+default-000           -            Sun-Aug-25-19:44-2019
+
+(zedenv-venv) root@caliban:~# zfs list -r rpool/ROOT
+NAME                     USED  AVAIL     REFER  MOUNTPOINT
+rpool/ROOT              1.17G   444G       96K  /rpool/ROOT
+rpool/ROOT/default-000     8K   444G     1.17G  /
+rpool/ROOT/pve-1        1.17G   444G     1.17G  /&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;Notice the &lt;code&gt;NR&lt;/code&gt;? This shows us that the &lt;code&gt;pve-1&lt;/code&gt; boot environment is
+now active (&lt;code&gt;N&lt;/code&gt;) and after the next reboot the &lt;code&gt;pve-1&lt;/code&gt; boot
+environment will be active (&lt;code&gt;R&lt;/code&gt;).&lt;/p&gt;
+
+&lt;p&gt;We also get information on the mountpoint of the boot environment
+as well as the date, when the boot environment was created, so we
+get a bit more information than only having the name of the boot
+environment.&lt;/p&gt;
+
+&lt;p&gt;On a fully supported system we could now also &lt;code&gt;activate&lt;/code&gt; the
+&lt;code&gt;default-000&lt;/code&gt; boot environment, that we&amp;rsquo;ve just created and we
+would then get an output similiar to this, showing us that
+&lt;code&gt;default-000&lt;/code&gt; would be active on the next
+reboot&lt;/label&gt;&lt;span class=&#34;marginnote&#34;&gt; &lt;code&gt;zedenv&lt;/code&gt; can also &lt;code&gt;destroy&lt;/code&gt;, &lt;code&gt;mount&lt;/code&gt; and &lt;code&gt;unmount&lt;/code&gt; boot environments as well as &lt;code&gt;get&lt;/code&gt; and &lt;code&gt;set&lt;/code&gt; some ZFS specific options, but right now what we want to focus on is how to get activation working with Proxmox. &lt;/span&gt;:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;(zedenv-venv) root@caliban:~# zedenv activate default-000
+(zedenv-venv) root@caliban:~# zedenv list
+ Name         Active   Mountpoint   Creation
+ pve-1        N        /            Mon-Aug-19-1:27-2019
+ default-000  R        -            Sun-Aug-25-19:44-2019&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;Since we are on Proxmox however, instead we&amp;rsquo;ll get the following
+error message:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;(zedenv-venv) root@caliban:~# zedenv activate default-000
+WARNING: Running activate without a bootloader. Re-run with a default bootloader, or with the &amp;#39;--bootloader/-b&amp;#39; flag. If you plan to manually edit your bootloader config this message can safely be ignored.&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;At this point you have seen how a typical boot environment manager
+looks like and you now know what &lt;code&gt;create&lt;/code&gt; and &lt;code&gt;activate&lt;/code&gt; will usually
+do.&lt;/p&gt;
+
+&lt;h3 id=&#34;systemd-boot-and-the-efi-system-partitions&#34;&gt;&lt;code&gt;systemd-boot&lt;/code&gt; and the EFI System Partitions&lt;/h3&gt;
+
+&lt;p&gt;Next we&amp;rsquo;ll take a closer look into the content of these EFI System
+Partitions and the files systemd-boot is using to start our system
+so lets take a look at what is stored on a ESP in Proxmox:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;(zedenv-venv) root@caliban:~# mount /dev/sda2 /boot/efi/
+(zedenv-venv) root@caliban:~# tree /boot/efi
+.
+├── EFI
+│   ├── BOOT
+│   │   └── BOOTX64.EFI
+│   ├── proxmox
+│   │   ├── 5.0.15-1-pve
+│   │   │   ├── initrd.img-5.0.15-1-pve
+│   │   │   └── vmlinuz-5.0.15-1-pve
+│   │   └── 5.0.18-1-pve
+│   │       ├── initrd.img-5.0.18-1-pve
+│   │       └── vmlinuz-5.0.18-1-pve
+│   └── systemd
+│       └── systemd-bootx64.efi
+└── loader
+    ├── entries
+    │   ├── proxmox-5.0.15-1-pve.conf
+    │   └── proxmox-5.0.18-1-pve.conf
+    └── loader.conf&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;So we have the kernels and initrd in &lt;code&gt;EFI/proxmox&lt;/code&gt; and some
+configuration files in &lt;code&gt;loader/&lt;/code&gt;.&lt;/p&gt;
+
+&lt;p&gt;The loader.conf file looks like this:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;(zedenv-venv) root@caliban:/boot/efi# cat loader/loader.conf
+timeout 3
+default proxmox-*&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;We have a 3 second timeout in &lt;code&gt;systemd-boot&lt;/code&gt; and the default boot
+entry has to begin with the string &lt;code&gt;proxmox&lt;/code&gt;. Nothing too
+complicated here.&lt;/p&gt;
+
+&lt;p&gt;Apart from that, we have the &lt;code&gt;proxmox-5.X.X-pve.conf&lt;/code&gt; files which we
+already know from last time (they are what is generated by the
+&lt;code&gt;/etc/kernel/postinst.d/zz-pve-efiboot&lt;/code&gt; script). They look like
+this:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;(zedenv-venv) root@caliban:/boot/efi# cat loader/entries/proxmox-5.0.18-1-pve.conf
+title    Proxmox Virtual Environment
+version  5.0.18-1-pve
+options  ip=[...] cryptdevice=UUID=[...] cryptdevice=UUID=[...] root=ZFS=rpool/ROOT/pve-1 boot=zfs
+linux    /EFI/proxmox/5.0.18-1-pve/vmlinuz-5.0.18-1-pve
+initrd   /EFI/proxmox/5.0.18-1-pve/initrd.img-5.0.18-1-pve&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;So basically they just point to the kernel and initrd in the
+&lt;code&gt;EFI/proxmox&lt;/code&gt; directory and start the kernel with the right &lt;code&gt;root&lt;/code&gt;
+option so that the correct boot environment is mounted.&lt;/p&gt;
+
+&lt;p&gt;At this point it makes sense to reiterate what a boot evironment
+is. Up until now we have defined a boot environment loosely as a
+file system snapshot we can boot into. At this point we have to
+refine the &amp;ldquo;we can boot into&amp;rdquo; part of this definition: A Boot
+environment is a filesystem snapshot together with the bootloader
+configuration as well as the kernel and initrd files from the
+moment the snapshot was taken.&lt;/p&gt;
+
+&lt;p&gt;The boot environment of &lt;code&gt;pve-1&lt;/code&gt; consists specifically of the
+following files from the ESP partition:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;.
+├── EFI
+│   ├── proxmox
+│   │   ├── 5.0.15-1-pve
+│   │   │   ├── initrd.img-5.0.15-1-pve
+│   │   │   └── vmlinuz-5.0.15-1-pve
+│   │   └── 5.0.18-1-pve
+│   │       ├── initrd.img-5.0.18-1-pve
+│   │       └── vmlinuz-5.0.18-1-pve
+└── loader
+    └── entries
+        ├── proxmox-5.0.15-1-pve.conf
+        └── proxmox-5.0.18-1-pve.conf&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;If you head over to the part of the &lt;a href=&#34;https://zedenv.readthedocs.io/en/latest/plugins.html#systemdboot&#34;&gt;zedenv documentation on
+systemd-boot&lt;/a&gt;, you see that there the creation of an &lt;code&gt;/env&lt;/code&gt; directory
+that holds all of the boot environment specific files on the ESP
+is proposed in that coupled with a bit of bind-mount magic tricks
+the underlying system into always finding the right files inside
+of &lt;code&gt;/boot&lt;/code&gt;, when actually only the files that that belong to the
+currently active boot environment are mounted.&lt;/p&gt;
+
+&lt;p&gt;This does not apply to our Proxmox situation, there is for example
+no mounted ESP. Also the &lt;code&gt;pve-efiboot-tool&lt;/code&gt; takes care of the kernel
+versions that are available in the &lt;code&gt;EFI/proxmox/&lt;/code&gt; directory so
+unless they are marked as manually installed (which you can do in
+Proxmox) some of the kernel versions will disappear at some point
+in time rendering the boot environment incomplete.&lt;/p&gt;
+
+&lt;h3 id=&#34;making-zedenv-and-proxmox-play-well-together&#34;&gt;Making &lt;code&gt;zedenv&lt;/code&gt; and Proxmox play well together&lt;/h3&gt;
+
+&lt;p&gt;I should probably point out here, that this part is more of a
+proposition, of how this could work than necessarily a good
+solution (it does work though). I&amp;rsquo;m pretty new to Proxmox and not
+at all an expert, when it comes to boot environments, so better
+take everything here with a few grains of salt.&lt;/p&gt;
+
+&lt;p&gt;As we&amp;rsquo;ve learned in the previous part, &lt;code&gt;zedenv&lt;/code&gt; is pretty awesome,
+but by design not exactly aimed at working with Proxmox. That
+being said, &lt;code&gt;zedenv&lt;/code&gt; is actually written with plugins in mind, I&amp;rsquo;ve
+skimmed the code and there is a bunch of pre- and post-hooking
+going on, so I think it could be possible to just set up some sort
+of Proxmox plugin for &lt;code&gt;zedenv&lt;/code&gt;. Since I&amp;rsquo;m not a &lt;code&gt;python&lt;/code&gt; guy and
+there&amp;rsquo;s of course also the option to add support to this from the
+Proxmox side, I&amp;rsquo;ll just write down how I&amp;rsquo;d imagine Proxmox and a
+boot environment manager such as &lt;code&gt;zedenv&lt;/code&gt; to work together without
+breaking too much on either side.&lt;/p&gt;
+
+&lt;p&gt;For this we have to consider the following things:&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;remember the &lt;code&gt;NR&lt;/code&gt;? I guess &lt;code&gt;zedenv&lt;/code&gt; just checks what is currently
+mounted as &lt;code&gt;/&lt;/code&gt; in order to find out what the currently active
+boot environment (&lt;code&gt;N&lt;/code&gt;) is. In Proxmox in order to find out what
+the active boot-environment after a reboot (&lt;code&gt;R&lt;/code&gt;) will be, we can
+just check the &lt;code&gt;/etc/kernel/cmdline&lt;/code&gt; file for the &lt;code&gt;root&lt;/code&gt; option&lt;/li&gt;
+
+&lt;li&gt;&lt;p&gt;&lt;code&gt;activate&lt;/code&gt; does not work with Proxmox, instead of creating the
+systemd-boot files, we could just run &lt;code&gt;pve-efiboot-tool refresh&lt;/code&gt;,
+which creates a copy of the necessary bootloader files on all
+ESPs and doing so also activates the boot environment, that is
+referenced in the &lt;code&gt;/etc/kernel/cmdline&lt;/code&gt; file. So with a template
+cmdline file like for example &lt;code&gt;/etc/kernel/cmdline.template&lt;/code&gt;, we
+could run something like this, basically creating a cmdline,
+that points to the correct boot environment and refresh the
+content of all ESPs at the same time:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;sed &amp;#39;s/BOOTENVIRONMENT/pve-2/&amp;#39; /etc/kernel/cmdline.template &amp;gt; /etc/kernel/cmdline
+pve-efiboot-tool refresh&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;p&gt;That&amp;rsquo;s about everything we&amp;rsquo;d need to replace in order to get a
+single boot environment to work with &lt;code&gt;zedenv&lt;/code&gt;.&lt;/p&gt;
+
+&lt;p&gt;Now if we want to have access to multiple boot environments at the
+same time, we can just do something quite similiar to what Proxmox
+does: The idea here would be that after any run of
+&lt;code&gt;pve-efiboot-tool refresh&lt;/code&gt;, we mount one of the ESPs and grab the
+all the files we need from &lt;code&gt;EFI/proxmox/&lt;/code&gt; as well as &lt;code&gt;loader/entries/&lt;/code&gt;
+and store them somewhere on &lt;code&gt;rpool&lt;/code&gt;. We could for example create
+&lt;code&gt;rpool/be&lt;/code&gt; for this exact reason.&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;zfs create -o mountpoint=/be rpool/be&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;The initrd that comes with a kernel might be customized, so
+although the initrd file is built against a kernel we want to
+always keep it directly tied to a specific boot environments. I&amp;rsquo;m
+not sure if the kernel files change over time or not though, so
+there&amp;rsquo;s two options here (Let&amp;rsquo;s just assume the first of the
+following to be sure):&lt;/p&gt;
+
+&lt;ul&gt;
+&lt;li&gt;If they are changing over time, while keeping the same kernel
+version, it is probably best to save them per boot environment&lt;/li&gt;
+&lt;li&gt;If they don&amp;rsquo;t change over time, we could just grab them once and
+then link to the kernel once we&amp;rsquo;ve already saved it&lt;/li&gt;
+&lt;/ul&gt;
+
+&lt;h4 id=&#34;a-better-proof-of-concept&#34;&gt;A better Proof of Concept&lt;/h4&gt;
+
+&lt;p&gt;So lets suppose that we have just freshly created the boot
+environment &lt;code&gt;EXAMPLE&lt;/code&gt; and activated it as described above using
+&lt;code&gt;pve-efiboot-tool refresh&lt;/code&gt; on a &lt;code&gt;/etc/kernel/cmdline&lt;/code&gt; file that we
+derived from the &lt;code&gt;/etc/kernel/cmdline.template&lt;/code&gt; and Proxmox has
+just set up all of our ESPs.&lt;/p&gt;
+
+&lt;p&gt;Now we create a &lt;code&gt;/be/EXAMPLE/&lt;/code&gt; directory, then mount one of the
+ESPs and in the next step copy over the files we are interested
+in.&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;(zedenv-venv) root@caliban:~# BOOTENVIRONMENT=EXAMPLE
+(zedenv-venv) root@caliban:~# mkdir -p /be/$BOOTENVIRONMENT/{kernel,entries}
+(zedenv-venv) root@caliban:~# zedenv create $BOOTENVIRONMENT
+(zedenv-venv) root@caliban:~# zedenv list
+Name         Active   Mountpoint   Creation
+pve-1        NR       -            Mon-Aug-19-1:27-2019
+EXAMPLE               -            Wed-Aug-28-20:24-2019
+
+
+(zedenv-venv) root@caliban:~# pve-efiboot-tool refresh
+Running hook script &amp;#39;pve-auto-removal&amp;#39;..
+Running hook script &amp;#39;zz-pve-efiboot&amp;#39;..
+Re-executing &amp;#39;/etc/kernel/postinst.d/zz-pve-efiboot&amp;#39; in new private mount namespace..
+Copying and configuring kernels on /dev/disk/by-uuid/EE5A-CB7D
+        Copying kernel and creating boot-entry for 5.0.15-1-pve
+        Copying kernel and creating boot-entry for 5.0.18-1-pve
+Copying and configuring kernels on /dev/disk/by-uuid/EE5B-4F9B
+        Copying kernel and creating boot-entry for 5.0.15-1-pve
+        Copying kernel and creating boot-entry for 5.0.18-1-pve
+
+
+(zedenv-venv) root@caliban:~# mount /dev/disk/by-uuid/$(cat /etc/kernel/pve-efiboot-uuids | head -n 1) /boot/efi
+
+
+(zedenv-venv) root@caliban:~# cp -r /boot/efi/EFI/proxmox/* /be/$BOOTENVIRONMENT/kernel/
+(zedenv-venv) root@caliban:~# cp /boot/efi/loader/entries/proxmox-*.conf /be/$BOOTENVIRONMENT/entries/&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;Now that we have copied over all files we need, it&amp;rsquo;s time to
+modify them &lt;code&gt;/be&lt;/code&gt; should look like this:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;/be/
+└── EXAMPLE
+    ├── entries
+    │   ├── proxmox-5.0.15-1-pve.conf
+    │   └── proxmox-5.0.18-1-pve.conf
+    └── kernel
+        ├── 5.0.15-1-pve
+        │   ├── initrd.img-5.0.15-1-pve
+        │   └── vmlinuz-5.0.15-1-pve
+        └── 5.0.18-1-pve
+            ├── initrd.img-5.0.18-1-pve
+            └── vmlinuz-5.0.18-1-pve&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;Lets first fix the file names, &lt;code&gt;/entries/proxmox-X.X.X-X-pve.conf&lt;/code&gt;
+should be named after our boot environment &lt;code&gt;EXAMPLE&lt;/code&gt;:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;BOOTENVIRONMENT=EXAMPLE
+cd /be/EXAMPLE/entries/
+for f in *.conf; do mv $f $(echo $f | sed &amp;#34;s/proxmox/$BOOTENVIRONMENT/&amp;#34;); done&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;Next let&amp;rsquo;s look into those configuration files:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;title    Proxmox Virtual Environment
+version  5.0.18-1-pve
+options  [...] root=ZFS=rpool/ROOT/EXAMPLE boot=zfs
+linux    /EFI/proxmox/5.0.18-1-pve/vmlinuz-5.0.18-1-pve
+initrd   /EFI/proxmox/5.0.18-1-pve/initrd.img-5.0.18-1-pve&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;As you can see they reference the initrd as well as the kernel
+(with the ESP being &lt;code&gt;/&lt;/code&gt;). We are going to put these into
+&lt;code&gt;/env/EXAMPLE/&lt;/code&gt; instead, so lets fix this. Also we want to change
+the Title from &amp;ldquo;Proxmox Virtual Environment&amp;rdquo; to the name of the
+boot environment.&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;cd /be/EXAMPLE/entries
+
+BOOTENVIRONMENT=EXAMPLE
+sed -i &amp;#34;s/EFI/env/;s/proxmox/$BOOTENVIRONMENT/&amp;#34; *.conf
+sed -i &amp;#34;s/Proxmox Virtual Environment/$BOOTENVIRONMENT/&amp;#34; *.conf&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;The configuration files now look like this:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;(zedenv-venv) root@caliban:/be/EXAMPLE/entries# cat EXAMPLE-5.0.18-1-pve.conf
+title    EXAMPLE
+version  5.0.18-1-pve
+options  [...] root=ZFS=rpool/ROOT/EXAMPLE boot=zfs
+linux    /env/EXAMPLE/5.0.18-1-pve/vmlinuz-5.0.18-1-pve
+initrd   /env/EXAMPLE/5.0.18-1-pve/initrd.img-5.0.18-1-pve&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;Remember the &lt;code&gt;loader.conf&lt;/code&gt; file that only consisted of 2 lines?
+We&amp;rsquo;ll also need to have one like it in order to boot into our new
+boot environment by default, so we&amp;rsquo;ll copy and modify it as well.&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;BOOTENVIRONMENT=EXAMPLE
+cat /boot/efi/loader/loader.conf | sed &amp;#34;s/proxmox/$BOOTENVIRONMENT/&amp;#34; &amp;gt; /be/$BOOTENVIRONMENT/loader.conf&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;Finally don&amp;rsquo;t forget to unmount the ESP:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;(zedenv-venv) root@caliban:~# umount /boot/efi/&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;Now &lt;code&gt;/be&lt;/code&gt; should look similiar to this and at this point we are
+done with the part where we configure our files:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;(zedenv-venv) root@caliban:~# tree /be
+/be
+└── EXAMPLE
+    ├── entries
+    │   ├── EXAMPLE-5.0.15-1-pve.conf
+    │   └── EXAMPLE-5.0.18-1-pve.conf
+    ├── kernel
+    │   ├── 5.0.15-1-pve
+    │   │   ├── initrd.img-5.0.15-1-pve
+    │   │   └── vmlinuz-5.0.15-1-pve
+    │   └── 5.0.18-1-pve
+    │       ├── initrd.img-5.0.18-1-pve
+    │       └── vmlinuz-5.0.18-1-pve
+    └── loader.conf&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;Next we can deploy our configuration to the ESP, to do so, we&amp;rsquo;ll
+do the following:&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;iterate over the ESPs used by Proxmox (remember their UUIDs are
+in &lt;code&gt;/etc/kernel/pve-efiboot-uuids&lt;/code&gt;)&lt;/li&gt;
+&lt;li&gt;mount a ESP&lt;/li&gt;
+&lt;li&gt;copy the files in &lt;code&gt;/be/EXAMPLE/kernel&lt;/code&gt; into &lt;code&gt;/env/EXAMPLE&lt;/code&gt;
+{{{sidenote(remember that this &lt;code&gt;/&lt;/code&gt; is the root of the ESP)}}&lt;/li&gt;
+&lt;li&gt;copy the config files in &lt;code&gt;/be/EXAMPLE/entries&lt;/code&gt; into
+&lt;code&gt;/loader/entries/&lt;/code&gt;&lt;/li&gt;
+&lt;li&gt;replace &lt;code&gt;/loader/loader.conf&lt;/code&gt; with our modified &lt;code&gt;loader.conf&lt;/code&gt; in
+order to activate the boot environment&lt;/li&gt;
+&lt;li&gt;unmount the ESP&lt;/li&gt;
+&lt;li&gt;repeat until we&amp;rsquo;ve updated all ESPs from
+&lt;code&gt;/etc/kernel/pve-efiboot-uuids&lt;/code&gt;&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;p&gt;In &lt;code&gt;bash&lt;/code&gt; this could look like this:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;BOOTENVIRONMENT=EXAMPLE
+
+for esp in $(cat /etc/kernel/pve-efiboot-uuids);
+do
+  mount /dev/disk/by-uuid/$esp /boot/efi
+  mkdir -p /boot/efi/env/$BOOTENVIRONMENT
+  cp -r /be/$BOOTENVIRONMENT/kernel/* /boot/efi/env/$BOOTENVIRONMENT/
+  cp /be/$BOOTENVIRONMENT/entries/* /boot/efi/loader/entries/
+  cat /be/$BOOTENVIRONMENT/loader.conf &amp;gt; /boot/efi/loader/loader.conf
+  umount /boot/efi
+done&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;Also note that reactivating the boot environment is now simply a
+matter of replacing the &lt;code&gt;loader.conf&lt;/code&gt;.&lt;/p&gt;
+
+&lt;p&gt;Now let&amp;rsquo;s check if everything looks good. The ESPs should look
+like this:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;(zedenv-venv) root@caliban:~# tree /boot/efi/
+/boot/efi/
+├── EFI
+│   ├── BOOT
+│   │   └── BOOTX64.EFI
+│   ├── proxmox
+│   │   ├── 5.0.15-1-pve
+│   │   │   ├── initrd.img-5.0.15-1-pve
+│   │   │   └── vmlinuz-5.0.15-1-pve
+│   │   └── 5.0.18-1-pve
+│   │       ├── initrd.img-5.0.18-1-pve
+│   │       └── vmlinuz-5.0.18-1-pve
+│   └── systemd
+│       └── systemd-bootx64.efi
+├── env
+│   └── EXAMPLE
+│       ├── 5.0.15-1-pve
+│       │   ├── initrd.img-5.0.15-1-pve
+│       │   └── vmlinuz-5.0.15-1-pve
+│       └── 5.0.18-1-pve
+│           ├── initrd.img-5.0.18-1-pve
+│           └── vmlinuz-5.0.18-1-pve
+└── loader
+    ├── entries
+    │   ├── EXAMPLE-5.0.15-1-pve.conf
+    │   ├── EXAMPLE-5.0.18-1-pve.conf
+    │   ├── proxmox-5.0.15-1-pve.conf
+    │   └── proxmox-5.0.18-1-pve.conf
+    └── loader.conf&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;The &lt;code&gt;loader.conf&lt;/code&gt; should default to &lt;code&gt;EXAMPLE&lt;/code&gt; entries:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;(zedenv-venv) root@caliban:~# cat /boot/efi/loader/loader.conf | grep EXAMPLE
+default EXAMPLE-*&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;The &lt;code&gt;EXAMPLE-*.conf&lt;/code&gt; files should point to the files in
+&lt;code&gt;/env/EXAMPLE&lt;/code&gt;:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;(zedenv-venv) root@caliban:~# cat /boot/efi/loader/entries/EXAMPLE-*.conf | grep &amp;#34;env/EXAMPLE&amp;#34;
+linux    /env/EXAMPLE/5.0.15-1-pve/vmlinuz-5.0.15-1-pve
+initrd   /env/EXAMPLE/5.0.15-1-pve/initrd.img-5.0.15-1-pve
+linux    /env/EXAMPLE/5.0.18-1-pve/vmlinuz-5.0.18-1-pve
+initrd   /env/EXAMPLE/5.0.18-1-pve/initrd.img-5.0.18-1-pve&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+&lt;p&gt;At this point all that&amp;rsquo;s left is to reboot and check if
+everything works. And it does indeed:&lt;/p&gt;
+
+&lt;figure&gt;
+    &lt;img src=&#34;https://tactical-documentation.github.io/ox-hugo/bootenvironments.png&#34;/&gt; 
+&lt;/figure&gt;
+
+
+&lt;h2 id=&#34;conclusion-and-future-work&#34;&gt;Conclusion and Future Work&lt;/h2&gt;
+
+&lt;p&gt;We&amp;rsquo;ve done it! It works and lets face it, it is an amazing feature,
+we all want to have this on our Hypervisors.&lt;/p&gt;
+
+&lt;p&gt;But let&amp;rsquo;s not forget that what we&amp;rsquo;ve done here is pretty much to
+write down two Proofs of Concepts. In order to make sure
+everything works nicely we probably need to at least add a bunch
+of checks.&lt;/p&gt;
+
+&lt;p&gt;From my point of view there&amp;rsquo;s basically two ways all of this could
+go forward:&lt;/p&gt;
+
+&lt;ol&gt;
+&lt;li&gt;The &lt;code&gt;zedenv&lt;/code&gt; project adopts support for the Proxmox platform by
+relaxing their assumption that the EFI Systems Partition has to
+be mounted and writes a bunch of gluecode around the Proxmox
+tooling.&lt;/li&gt;
+&lt;li&gt;The Proxmox team adds native support for Boot Environments to
+their pve-tooling. This would mean that they would have to add
+all the functionality of a boot environment manager such as
+&lt;code&gt;zedenv&lt;/code&gt; or it&amp;rsquo;s unix counterpart &lt;code&gt;beadm&lt;/code&gt;, they would also have to
+consider making EFI System Partition bigger, and the kernels and
+boot environments wouldn&amp;rsquo;t necessarily require something like
+&lt;code&gt;rpool/be&lt;/code&gt; to be stored on &lt;label class=&#34;margin-toggle sidenote-number&#34;&gt;&lt;/label&gt;&lt;span class=&#34;sidenote&#34;&gt; On the topic of not having to use some intermediate storage such as &lt;code&gt;rpool/be&lt;/code&gt;, having the boot environments stored additionally on zfs would enable to keep the ESP relatively small and not only distinguish between active and inactive boot environments, but also between ones that are loaded onto the ESP and those that are merely available, this isn&amp;rsquo;t exactly what &lt;code&gt;zedenv&lt;/code&gt; or &lt;code&gt;beadm&lt;/code&gt; do, but it might be a nice feature to really be able to go back to older version in the Enterprise context of Proxmox &lt;/span&gt;, but that
+should be trivial. Also I do like the idea of templating the
+&lt;code&gt;/etc/kernel/cmdline&lt;/code&gt; file so that generating boot configurations
+works using the included pve tooling.&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;p&gt;Personally I think it would be great to get support for boot
+environments directly from Proxmox, since - let&amp;rsquo;s face it - it&amp;rsquo;s
+almost working out of the box anyway and a custom tool such as
+&lt;code&gt;pve-beadm&lt;/code&gt; would better fit the way Proxmox handles the boot process
+than something that is build around it.&lt;/p&gt;
+
+&lt;p&gt;Anyway that&amp;rsquo;s about all from me this time. I&amp;rsquo;m now a few days into
+my little venture of &amp;lsquo;just installing Proxmox because it will work
+out of the box which will save me some time&amp;rsquo; and I feel quite
+confident that I&amp;rsquo;ve almost reached the stage where I&amp;rsquo;m actually
+done with installing the host system and can start running some
+guests. There&amp;rsquo;s literally only one or two things left to try out..&lt;/p&gt;
+
+&lt;p&gt;If anyone at Proxmox reads this, you guys are amazing! I haven&amp;rsquo;t
+even really finished my first install yet and I&amp;rsquo;m hooked with your
+system!&lt;/p&gt;
+</description>
+			</item>
 	</channel>
 </rss>

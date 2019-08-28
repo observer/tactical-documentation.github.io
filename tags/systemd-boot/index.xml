@@ -6,7 +6,7 @@
     <description>Recent content in systemd-boot on tactical-documentation</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
-    <lastBuildDate>Fri, 23 Aug 2019 00:00:00 +0000</lastBuildDate>
+    <lastBuildDate>Wed, 28 Aug 2019 00:00:00 +0000</lastBuildDate>
     
 	<atom:link href="https://tactical-documentation.github.io/tags/systemd-boot/index.xml" rel="self" type="application/rss+xml" />
     
@@ -18,6 +18,15 @@
       
       <guid>https://tactical-documentation.github.io/post/proxmoxve6-zfs-luks-systemdboot-dropbear/</guid>
       <description>This describes how to set up a fully encrypted Proxmox VE 6 host with ZFS root and unlocking it remotely using the dropbear ssh server. Also it describes how you can do that, while keeping systemd-boot and thus also the pve tooling intactI&amp;rsquo;m not sure if the pve tooling still works if you replace systemd-boot with grub, which seems to be the common solution to setting up this kind of setup,maybe it does .</description>
+    </item>
+    
+    <item>
+      <title>Proof of Concept: Adding Boot Environments to Proxmox VE 6</title>
+      <link>https://tactical-documentation.github.io/post/poc-proxmox-and-boot-environments/</link>
+      <pubDate>Wed, 28 Aug 2019 00:00:00 +0000</pubDate>
+      
+      <guid>https://tactical-documentation.github.io/post/poc-proxmox-and-boot-environments/</guid>
+      <description>Dear Reader, this time I would like to invite you onto a small journey: To boldly go where no man has gone beforeAlright, that&amp;rsquo;s not true, but I think it&amp;rsquo;s the first time someone documents this kind of thing in the context of Proxmox . We&amp;rsquo;re about to embark on a journey to make your Proxmox host quite literally immortal. Also since what we are essentially doing here is only a Proof of concept, you probably shouldn&amp;rsquo;t use it in production, but as it&amp;rsquo;s really amazing, so you might want to try it out in a test environment.</description>
     </item>
     
   </channel>
