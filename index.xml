@@ -5,7 +5,7 @@
 		<description>Recent content on tactical-documentation</description>
 		<generator>Hugo 0.57.2 -- gohugo.io</generator>
 		<language>en-us</language>
-		<lastBuildDate>Sun, 01 Sep 2019 11:28:45 +0000</lastBuildDate>
+		<lastBuildDate>Sun, 01 Sep 2019 11:44:46 +0000</lastBuildDate>
 		<atom:link href="https://tactical-documentation.github.io/index.xml" rel="self" type="application/rss+xml" />
 			
 			
@@ -773,23 +773,23 @@ start old boot environments.&lt;/p&gt;
 size, so we can currently store about 10 different kernels at a
 time.&lt;/p&gt;
 
-&lt;p&gt;If we want to increase the size of the ESP however we might be out
-of luck, since ZFS does not like to shrink, so if you&amp;rsquo;re in the
-situation of setting up a fresh Proxmox host, you might want to
-plug in a USB Stick (with less storage than your drives) or
-something similiar and create a mirrored ZFS RAID1 with this
-device and the other two drives which you really want to use for
-storage. This way the size of the resulting ZFS partition will be
-smaller than the drives you actually use and after the initial
-installation you can just:&lt;/p&gt;
+&lt;p&gt;If we want to increase the size of the ESP however we might be
+out of luck, since ZFS does not like to shrink, so if you&amp;rsquo;re in
+the situation of setting up a fresh Proxmox host, you can just
+set up the size of the ZFS partition in the advanced options in
+the installer &lt;del&gt;you might want&lt;/del&gt; &lt;del&gt;to plug in a USB Stick (with less
+storage than your drives) or&lt;/del&gt; &lt;del&gt;something similiar and create a
+mirrored ZFS RAID1 with this&lt;/del&gt; &lt;del&gt;device and the other two drives
+which you really want to use for&lt;/del&gt; &lt;del&gt;storage&lt;/del&gt;. This way the size of
+the resulting ZFS partition will be smaller than the drives you
+actually use and after the initial installation you can just:&lt;/p&gt;
 
 &lt;ol&gt;
-&lt;li&gt;Remove the small drive from &lt;code&gt;rpool&lt;/code&gt;&lt;/li&gt;
-&lt;li&gt;Remove the first normal drive from &lt;code&gt;rpool&lt;/code&gt;, delete the ZFS
-partition, increase the size of the ESP to whatever you want,
-recreate a ZFS partition and readd it to &lt;code&gt;rpool&lt;/code&gt;&lt;/li&gt;
+&lt;li&gt;Remove the first drive from &lt;code&gt;rpool&lt;/code&gt;, delete the ZFS partition,
+increase the size of the ESP to whatever you want, recreate a
+ZFS partition and readd it to &lt;code&gt;rpool&lt;/code&gt;&lt;/li&gt;
 &lt;li&gt;wait until &lt;code&gt;rpool&lt;/code&gt; has resilvered the drive&lt;/li&gt;
-&lt;li&gt;repeat 2. and 3. with your second drive.&lt;/li&gt;
+&lt;li&gt;repeat this with your second drive.&lt;/li&gt;
 &lt;/ol&gt;
 
 &lt;h3 id=&#34;zedenv-a-boot-environment-manager&#34;&gt;&lt;code&gt;zedenv&lt;/code&gt;: A Boot Environment Manager&lt;/h3&gt;

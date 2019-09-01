@@ -964,23 +964,23 @@ start old boot environments.</p>
 size, so we can currently store about 10 different kernels at a
 time.</p>
 
-<p>If we want to increase the size of the ESP however we might be out
-of luck, since ZFS does not like to shrink, so if you&rsquo;re in the
-situation of setting up a fresh Proxmox host, you might want to
-plug in a USB Stick (with less storage than your drives) or
-something similiar and create a mirrored ZFS RAID1 with this
-device and the other two drives which you really want to use for
-storage. This way the size of the resulting ZFS partition will be
-smaller than the drives you actually use and after the initial
-installation you can just:</p>
+<p>If we want to increase the size of the ESP however we might be
+out of luck, since ZFS does not like to shrink, so if you&rsquo;re in
+the situation of setting up a fresh Proxmox host, you can just
+set up the size of the ZFS partition in the advanced options in
+the installer <del>you might want</del> <del>to plug in a USB Stick (with less
+storage than your drives) or</del> <del>something similiar and create a
+mirrored ZFS RAID1 with this</del> <del>device and the other two drives
+which you really want to use for</del> <del>storage</del>. This way the size of
+the resulting ZFS partition will be smaller than the drives you
+actually use and after the initial installation you can just:</p>
 
 <ol>
-<li>Remove the small drive from <code>rpool</code></li>
-<li>Remove the first normal drive from <code>rpool</code>, delete the ZFS
-partition, increase the size of the ESP to whatever you want,
-recreate a ZFS partition and readd it to <code>rpool</code></li>
+<li>Remove the first drive from <code>rpool</code>, delete the ZFS partition,
+increase the size of the ESP to whatever you want, recreate a
+ZFS partition and readd it to <code>rpool</code></li>
 <li>wait until <code>rpool</code> has resilvered the drive</li>
-<li>repeat 2. and 3. with your second drive.</li>
+<li>repeat this with your second drive.</li>
 </ol>
 
 <h3 id="zedenv-a-boot-environment-manager"><code>zedenv</code>: A Boot Environment Manager</h3>
