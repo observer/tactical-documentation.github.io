@@ -5,7 +5,7 @@
 		<description>Recent content on tactical-documentation</description>
 		<generator>Hugo 0.57.2 -- gohugo.io</generator>
 		<language>en-us</language>
-		<lastBuildDate>Wed, 28 Aug 2019 23:02:26 +0000</lastBuildDate>
+		<lastBuildDate>Sun, 01 Sep 2019 11:28:45 +0000</lastBuildDate>
 		<atom:link href="https://tactical-documentation.github.io/index.xml" rel="self" type="application/rss+xml" />
 			
 			
@@ -585,11 +585,11 @@ as well as container templates are probably not worth keeping in
 our boot environments either.&lt;/p&gt;
 
 &lt;p&gt;So lets take &lt;code&gt;/var/lib/vz&lt;/code&gt; out of &lt;code&gt;rpool/root/pve-1&lt;/code&gt;, first create a
-new zvol:&lt;/p&gt;
+new dataset:&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;root@caliban:/var/lib# zfs create -o mountpoint=/var/lib/vz rpool/vz
 cannot mount &amp;#39;/var/lib/vz&amp;#39;: directory is not empty&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
 &lt;p&gt;Then move over the content of &lt;code&gt;/var/lib/vz&lt;/code&gt; into the newly created
-and not yet mounted zvol:&lt;/p&gt;
+and not yet mounted dataset:&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;mv /var/lib/vz/ vz.old/ &amp;amp;&amp;amp; zfs mount rpool/vz &amp;amp;&amp;amp; mv vz.old/* /var/lib/vz/ &amp;amp;&amp;amp; rmdir vz.old&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
 &lt;p&gt;If you don&amp;rsquo;t have any images, templates or backups yet, or you just
 don&amp;rsquo;t particularly care about them, you can of course also just
@@ -613,7 +613,7 @@ exclude from snapshots! Better be sure to check what&amp;rsquo;s in there.&lt;/p
 &lt;p&gt;Also there are some other directories we might want to
 exclude. There is for example &lt;code&gt;/tmp&lt;/code&gt; as well as &lt;code&gt;/var/tmp/&lt;/code&gt; which
 shouldn&amp;rsquo;t include anything that is worth keeping, but which of
-course would be snapshotted as well, we can create zvols for them
+course would be snapshotted as well, we can create datasets for them
 as well and they should be automounted on reboot:&lt;/p&gt;
 &lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-text&#34; data-lang=&#34;text&#34;&gt;zfs create -o mountpoint=/tmp     rpool/tmp
 zfs create -o mountpoint=/var/tmp rpool/var_tmp&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
