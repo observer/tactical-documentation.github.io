@@ -5,7 +5,7 @@
 		<description>Recent content on tactical-documentation</description>
 		<generator>Hugo 0.57.2 -- gohugo.io</generator>
 		<language>en-us</language>
-		<lastBuildDate>Sun, 01 Sep 2019 11:44:46 +0000</lastBuildDate>
+		<lastBuildDate>Mon, 02 Sep 2019 16:37:25 +0000</lastBuildDate>
 		<atom:link href="https://tactical-documentation.github.io/index.xml" rel="self" type="application/rss+xml" />
 			
 			
@@ -108,7 +108,7 @@ to &lt;code&gt;/dev/mapper/cryptrpool1&lt;/code&gt; and reattach it to &lt;code&
 &lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;zpool detach rpool ata-Samsung_SSD_850_EVO_500GB_XXXXXXXXXXXXXXX-part3
 cryptsetup luksFormat /dev/disk/by-id/ata-Samsung_SSD_850_EVO_500GB_XXXXXXXXXXXXXXX-part3
 cryptsetup luksOpen /dev/disk/by-id/ata-Samsung_SSD_850_EVO_500GB_XXXXXXXXXXXXXXX-part3 cryptrpool1
-zpool attach rpool ata-Samsung_SSD_850_EVO_500GB_XXXXXXXXXXXXXXX-part3 cryptrpool1&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
+zpool attach rpool ata-WDC_WDS500G2B0A-XXXXXX_XXXXXXXXXXXX-part3 cryptrpool1&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;
 &lt;p&gt;Wait until the &lt;code&gt;scan&lt;/code&gt; line of &lt;code&gt;zpool status&lt;/code&gt; displays that the drive
 has been resilvered successfully. You should see something
 similiar to this:&lt;/p&gt;
