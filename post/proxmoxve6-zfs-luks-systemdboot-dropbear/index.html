@@ -579,6 +579,9 @@ with ZFS root and unlocking it remotely using the dropbear ssh
 server. Also it describes how you can do that, while keeping
 systemd-boot and thus also the pve tooling intact<label class="margin-toggle sidenote-number"></label><span class="sidenote"> I&rsquo;m not sure if the pve tooling still works if you replace systemd-boot with grub, which seems to be the common solution to setting up this kind of setup,maybe it does </span>.</p>
 
+<p>Update: This post has been translated into czech language and was
+published on <a href="https://www.abclinuxu.cz/clanky/sifrovany-proxmox-ve-6-zfs-luks-systemd-boot-a-dropbear">abclinuxu.cz</a>.</p>
+
 <h2 id="overview">Overview</h2>
 
 <p>We are going to do the following:</p>
@@ -764,7 +767,7 @@ ServerAliveInterval 120
 Host unlock_caliban
   Hostname 1.2.3.4
   User root
-  Port 2222
+  Port 12345
 
 Host caliban
   Hostname 1.2.3.4

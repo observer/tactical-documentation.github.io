@@ -3,9 +3,9 @@
 		<title>tactical-documentation</title>
 		<link>https://tactical-documentation.github.io/</link>
 		<description>Recent content on tactical-documentation</description>
-		<generator>Hugo 0.57.2 -- gohugo.io</generator>
+		<generator>Hugo 0.58.1 -- gohugo.io</generator>
 		<language>en-us</language>
-		<lastBuildDate>Mon, 02 Sep 2019 16:37:25 +0000</lastBuildDate>
+		<lastBuildDate>Mon, 09 Sep 2019 23:19:28 +0000</lastBuildDate>
 		<atom:link href="https://tactical-documentation.github.io/index.xml" rel="self" type="application/rss+xml" />
 			
 			
@@ -20,6 +20,9 @@
 with ZFS root and unlocking it remotely using the dropbear ssh
 server. Also it describes how you can do that, while keeping
 systemd-boot and thus also the pve tooling intact&lt;label class=&#34;margin-toggle sidenote-number&#34;&gt;&lt;/label&gt;&lt;span class=&#34;sidenote&#34;&gt; I&amp;rsquo;m not sure if the pve tooling still works if you replace systemd-boot with grub, which seems to be the common solution to setting up this kind of setup,maybe it does &lt;/span&gt;.&lt;/p&gt;
+
+&lt;p&gt;Update: This post has been translated into czech language and was
+published on &lt;a href=&#34;https://www.abclinuxu.cz/clanky/sifrovany-proxmox-ve-6-zfs-luks-systemd-boot-a-dropbear&#34;&gt;abclinuxu.cz&lt;/a&gt;.&lt;/p&gt;
 
 &lt;h2 id=&#34;overview&#34;&gt;Overview&lt;/h2&gt;
 
@@ -206,7 +209,7 @@ ServerAliveInterval 120
 Host unlock_caliban
   Hostname 1.2.3.4
   User root
-  Port 2222
+  Port 12345
 
 Host caliban
   Hostname 1.2.3.4
