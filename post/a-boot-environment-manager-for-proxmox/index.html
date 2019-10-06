@@ -1,0 +1,1118 @@
+<!DOCTYPE html>
+<html lang="en-us">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <meta name="HandheldFriendly" content="True">
+    <meta name="MobileOptimized" content="320">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="referrer" content="no-referrer">
+    
+
+    <title>
+      
+      
+         Introducing a Boot Environment Manager for Proxmox 
+      
+    </title>
+    <link rel="canonical" href="https://tactical-documentation.github.io/post/a-boot-environment-manager-for-proxmox/">
+
+    <style>
+
+  @font-face {
+    font-family: 'Comfortaa';
+    font-style: normal;
+    font-weight: 400;
+    src: local('Comfortaa Regular'), url('/fonts/Comfortaa-Regular.ttf');
+  }
+  
+  @font-face {
+    font-family: 'Inconsolata';
+    font-style: normal;
+    font-weight: 400;
+    src: local('Inconsolata Regular'), url('/fonts/Inconsolata-Regular.ttf');
+  }
+
+  @font-face {
+    font-family: 'Montserrat';
+    font-style: normal;
+    font-weight: 400;
+    src: local('Montserrat Regular'), url('/fonts/Montserrat-Regular.ttf');
+  }
+  
+  * {
+    border:0;
+    font:inherit;
+    font-size:100%;
+    vertical-align:middle;
+    margin:0;
+    padding:0;
+    color: black;
+    text-decoration-skip: ink;
+  }
+
+  body {
+    font-family: Montserrat, 'Open Sans', 'Myriad Pro', Myriad, sans-serif;
+    font-size:17px;
+    line-height:160%;
+    color:#1d1313;
+    max-width:700px;
+    margin:auto;
+    counter-reset: sidenote-counter;
+  }
+
+
+  label.sidenote-number { display: inline; }
+
+  .sidenote, .marginnote { float: right;
+                         clear: right;
+                         margin-right: -60%;
+                         width: 50%;
+                         margin-top: 0;
+                         margin-bottom: 0;
+                         font-size: 10px;
+                         color: grey;
+                         line-height: 1.3;
+                         vertical-align: baseline;
+                         position: relative; }
+
+  .sidenote-number { counter-increment: sidenote-counter; }
+  
+  .sidenote-number:after, .sidenote:before { font-family: et-book-roman-old-style;
+                                             position: relative;
+                                             vertical-align: baseline; }
+  
+  .sidenote-number:after { content: counter(sidenote-counter);
+                           font-size: 10px;
+                           top: -0.5rem;
+                           left: 0.1rem; }
+  
+  .sidenote:before { content: counter(sidenote-counter) " ";
+                     font-size: 7px;
+                     top: -0.5rem; }
+  
+  blockquote .sidenote, { margin-right: -82%;
+                                                 min-width: 59%;
+                                                 text-align: left; }
+  
+  .marginnote > code,
+  .sidenote > code {
+    font-size: 10px; 
+    padding: 2px;
+  }
+
+
+  p {
+    margin: 20px 0;
+  }
+
+  a img {
+    border:none;
+  }
+
+  img {
+    margin: 10px auto 10px auto;
+    max-width: 100%;
+    display: block;
+  }
+
+  table {
+    display: table;
+    border: 1px solid black;
+    border-collapse: collapse;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  th, td {
+    padding: 5px;
+    border: 1px solid black;
+    text-align: left;
+  }
+
+  .table-caption {
+    text-align:center;
+  }
+  
+  figcaption {
+    text-align:center;
+  }
+
+  th {
+    font-weight: bold;
+  }
+
+  .left-justify {
+    float: left;
+  }
+
+  .right-justify {
+    float:right;
+  }
+
+  pre, code {
+    font: 12px Inconsolata, Consolas, "Liberation Mono", Menlo, Courier, monospace;
+    background-color: #f7f7f7;
+  }
+
+  code {
+    font-size: 12px;
+    padding: 4px;
+  }
+
+  pre {
+    margin-top: 0;
+    margin-bottom: 16px;
+    word-wrap: normal;
+    padding: 16px;
+    overflow: auto;
+    font-size: 85%;
+    line-height: 1.45;
+  }
+
+  pre>code {
+    padding: 0;
+    margin: 0;
+    font-size: 100%;
+    word-break: normal;
+    white-space: pre;
+    background: transparent;
+    border: 0;
+  }
+
+  pre code {
+    display: inline;
+    max-width: auto;
+    padding: 0;
+    margin: 0;
+    overflow: visible;
+    line-height: inherit;
+    word-wrap: normal;
+    background-color: transparent;
+    border: 0;
+  }
+
+  pre code::before,
+  pre code::after {
+    content: normal;
+  }
+
+  em,q,em,dfn {
+    font-style:italic;
+  }
+
+  .sans,html .gist .gist-file .gist-meta {
+    font-family: Montserrat, "Open Sans","Myriad Pro",Myriad,sans-serif;
+  }
+
+  .mono,pre,code,tt,p code,li code {
+    font-family:Inconsolata, Menlo,Monaco,"Andale Mono","lucida console","Courier New",monospace;
+  }
+
+  .heading,.serif,h1,h2,h3 {
+    font-family:"Comfortaa";
+  }
+
+  strong {
+    font-weight:600;
+  }
+
+  q:before {
+    content:"\201C";
+  }
+
+  q:after {
+    content:"\201D";
+  }
+
+  del,s {
+    text-decoration:line-through;
+  }
+
+  blockquote {
+    font-family:"Comfortaa";
+    text-align:center;
+    padding:50px;
+  }
+
+  blockquote p {
+    display:inline-block;
+    font-style:italic;
+  }
+
+  blockquote:before,blockquote:after {
+    font-family:"Comfortaa";
+    content:'\201C';
+    font-size:30px;
+    color:#403c3b;
+  }
+
+  blockquote:after {
+    content:'\201D';
+  }
+
+  hr {
+    width:40%;
+    height: 1px;
+    background:#403c3b;
+    margin: 25px auto;
+  }
+
+  h1 {
+    font-size:35px;
+  }
+
+  h2 {
+    font-size:28px;
+  }
+
+  h3 {
+    font-size:22px;
+    margin-top:18px;
+  }
+
+  h1 a,h2 a,h3 a {
+    text-decoration:none;
+  }
+
+  h1,h2 {
+    margin-top:28px;
+  }
+
+  #sub-header, time {
+    color:#403c3b;
+    font-size:13px;
+  }
+
+  #sub-header {
+    margin: 0 4px;
+  }
+
+  #nav h1 a {
+    font-size:35px;
+    color:#1d1313;
+    line-height:120%;
+  }
+
+  .posts_listing a,#nav a {
+    text-decoration: none;
+  }
+
+  li {
+    margin-left: 20px;
+  }
+
+  ul li {
+    margin-left: 5px;
+  }
+
+  ul li {
+    list-style-type: none;
+  }
+  ul li:before {
+    content:"\00B7 \0020";
+  }
+
+  #nav ul li:before, .posts_listing li:before {
+    content:'';
+    margin-right:0;
+  }
+
+  #content {
+    text-align:left;
+    width:100%;
+    font-size:15px;
+    padding:60px 0 80px;
+  }
+
+  #content h1,#content h2 {
+    margin-bottom:5px;
+  }
+
+  #content h2 {
+    font-size:25px;
+  }
+
+  #content .entry-content {
+    margin-top:15px;
+  }
+
+  #content time {
+    margin-left:3px;
+  }
+
+  #content h1 {
+    font-size:30px;
+  }
+
+  .highlight {
+    margin: 10px 0;
+  }
+
+  .posts_listing {
+    margin:0 0 50px;
+  }
+
+  .posts_listing li {
+    margin:0 0 0 15px;
+  }
+
+  .posts_listing li a:hover,#nav a:hover {
+    text-decoration: underline;
+  }
+
+  #nav {
+    text-align:center;
+    position:static;
+    margin-top:60px;
+  }
+
+  #nav ul {
+    display: table;
+    margin: 8px auto 0 auto;
+  }
+
+  #nav li {
+    list-style-type:none;
+    display:table-cell;
+    font-size:15px;
+    padding: 0 20px;
+  }
+
+  #links {
+    margin: 50px 0 0 0;
+  }
+
+  #links :nth-child(2) {
+    float:right;
+  }
+
+  #not-found {
+    text-align: center;
+  }
+
+  #not-found a {
+    font-family:"Comfortaa";
+    font-size: 200px;
+    text-decoration: none;
+    display: inline-block;
+    padding-top: 225px;
+  }
+
+  #menu a {
+    color: #aaa;
+    font-family: Montserrat, "Menu",sans-serif;
+     
+    font-size: 9.65px;
+    margin-right: 0.85em;
+    text-shadow: 0 1px 1px #fff;
+  }
+
+
+  span.left { float: left; }
+
+  span.right {
+    float: right;
+    margin-right: -0.85em;
+  }
+
+  @media (max-width: 750px) {
+    body {
+      padding-left:20px;
+      padding-right:20px;
+    }
+
+    #nav h1 a {
+      font-size:28px;
+    }
+
+    #nav li {
+      font-size:13px;
+      padding: 0 15px;
+    }
+
+    #content {
+      margin-top:0;
+      padding-top:50px;
+      font-size:14px;
+    }
+
+    #content h1 {
+      font-size:25px;
+    }
+
+    #content h2 {
+      font-size:22px;
+    }
+
+    .posts_listing li div {
+      font-size:12px;
+    }
+
+
+    .sidenote, .marginnote { display: block;
+                             float: left;
+                             left: 1rem;
+                             clear: both;
+                             width: 95%;
+                             line-height: 1;
+                             margin: 1rem 2.5%;
+                             vertical-align: baseline;
+                             position: relative; }
+
+
+  }
+
+  @media (max-width: 400px) {
+    body {
+      padding-left:20px;
+      padding-right:20px;
+    }
+
+    #nav h1 a {
+      font-size:22px;
+    }
+
+    #nav li {
+      font-size:12px;
+      padding: 0 10px;
+    }
+
+    #content {
+      margin-top:0;
+      padding-top:20px;
+      font-size:12px;
+    }
+
+    #content h1 {
+      font-size:20px;
+    }
+
+    #content h2 {
+      font-size:18px;
+    }
+
+    .posts_listing li div{
+      font-size:12px;
+    }
+  }
+</style>
+
+
+  </head>
+
+  <body>
+    <div id="menu">
+      <span class="left" style="display:inline:block">    
+          <font size="10"> <a href="https://tactical-documentation.github.io">tactical-documentation</a> </font>
+      </span>
+      <span class="right" style="display:inline:block">    
+          <font size="10"> <a href="https://tactical-documentation.github.io/tags">tags</a> </font>
+      
+        
+          <font size="10"> <a href="https://tactical-documentation.github.io/about/">about</a> </font>
+        
+      
+        
+      
+        
+          <font size="10"> <a href="https://tactical-documentation.github.io/src/">src</a> </font>
+        
+      
+        
+      
+        
+      
+          <font size="10"> <a href="https://tactical-documentation.github.io/index.xml">rss</a> </font>
+      </span>
+    </div>
+
+
+<section id=content>
+  <h1> Introducing a Boot Environment Manager for Proxmox </h1>
+
+  
+    <div id=sub-header>
+      October 2019 · 17 minute read
+    </div>
+  
+
+   
+   
+  
+  <div id=sub-header>
+    <ul id="tags">
+    Tags:
+        
+            
+            
+                <a href="https://tactical-documentation.github.io/tags/proxmox/">proxmox</a>
+            
+        
+            
+            
+                <a href="https://tactical-documentation.github.io/tags/zfs/">zfs</a>
+            
+        
+            
+            
+                <a href="https://tactical-documentation.github.io/tags/systemd-boot/">systemd-boot</a>
+            
+        
+            
+            
+        
+    </ul>
+  </div>
+  
+
+  <div class="entry-content">
+    
+
+<p>This post introduces a fork of the FreeBSD <code>beadm</code> utility which can be
+used to manage Boot Environments on Proxmox ZFS Installations.</p>
+
+<p>In this Post I will showcase how to use the <code>beadm</code> Boot Environment
+manager in Proxmox. After the showcase there are some notes on what I
+did to make <code>beadm</code> run on Linux in general and finally a part about
+what has been changed in order to make <code>beadm</code> work with Proxmox
+specifically.</p>
+
+<p>The version of beadm that is compatible with Proxmox can be found
+<a href="https://github.com/tactical-documentation/beadm">on github</a>.</p>
+
+<h2 id="overview">Overview</h2>
+
+<ul>
+<li>Introduction</li>
+<li>Managing Boot Environments in Proxmox</li>
+<li>Making <code>beadm</code> work under Linux</li>
+<li>Making <code>beadm</code> work with Proxmox</li>
+<li>Conclusion and Further Work</li>
+</ul>
+
+<h2 id="introduction">Introduction</h2>
+
+<p>In my <a href="https://tactical-documentation.github.io/post/poc-proxmox-and-boot-environments/">previous post</a> I&rsquo;ve already outlined how boot environments work
+in general, how you can make them work under Proxmox VE 6 and
+presented a Proof of Concept solution of how they can be set up
+programmatically using <code>zedenv</code>, a python-based manager for Boot
+Environments.</p>
+
+<p>Since my last post I&rsquo;ve taken a bit of a closer look at both the
+code of <code>zedenv</code> as well as <code>beadm</code> and decided to fork the latter and
+make it work with Proxmox.</p>
+
+<p>While this is still a Proof of Concept, it can be simply plugged
+into an existing Proxmox ZFS installation in order to enable and
+manage Boot Environments.</p>
+
+<p>As with the previous PoC, I&rsquo;ve written the code in such a way that no
+parts of Proxmox have been changed. Apart from some additional files
+that are created, your system stays as it is, also all Boot Entries
+created by Proxmox are still available in parallel to the Boot
+Environment entries in your bootloader.</p>
+
+<p></label><span class="marginnote"> Since the last post I&rsquo;ve simply reinstalled Proxmox with 10GB ESPs on both of my system drives, so I have enough space to store more Boot Environments. In order to install with a bigger ESP, install the system with custom (smaller) ZFS partition size, then after the installation, remove a drive from your ZFS pool, delete the ZFS partition, resize the ESP, create a new ZFS partition, add it back to the pool, resilver and repeat these steps for the second drive. </span></p>
+
+<h2 id="managing-boot-environments-in-proxmox">Managing Boot Environments in Proxmox</h2>
+
+<p>In order to use <code>beadm</code> with Proxmox you can <a href="https://github.com/tactical-documentation/beadm">grab a copy from
+github</a>, make it executable and start using it right away. I do
+strongly encurage you to either use a test installation or look at
+the code and read through this post and the
+<a href="https://tactical-documentation.github.io/post/poc-proxmox-and-boot-environments/">previous
+one</a> first, so you know what is going on.</p>
+
+<p>On the first run you&rsquo;ll see the following error message, read it,
+create the template file and you are good to go (also remember that
+from now on, any changes to the <code>cmdline</code> file should be made to the
+template file instead, because the <code>cmdline</code> file will be
+autogenerated):</p>
+<div class="highlight"><pre style="background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-text" data-lang="text">root@caliban:~# ./beadm
+ERROR: /etc/kernel/cmdline.template not found!
+
+You need a template file for the kernel commandline.
+The template file has to be identical to the /etc/kernel/cmdline file, but instead of a specific root it must contain the string &#34;__BE_NAME&#34;
+The template file is used in order to create a valid kernel commandline for systemd-boot, which points to the correct boot environment.
+
+In order to use beadm, create a valid /etc/kernel/cmdline.template
+
+Example: if your /etc/kernel/cmdline looks like this:
+         root=ZFS=rpool/ROOT/pve-1 boot=zfs
+         then the template file should contain:
+         root=ZFS=rpool/ROOT/__BE_NAME boot=zfs</code></pre></div>
+<p>After that you can list your boot environments with:</p>
+<div class="highlight"><pre style="background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-text" data-lang="text">root@caliban:~# ./beadm list
+
+Boot Environments on caliban:
+name                 state      used       ds      snaps    ubrr    refs    creation date                  origin
+----                 -----      ----       --      -----    ----    ----    ---------------------          ------
+pve-1                NR         1.20G      1.15G   44.8M    0B      1.15G   Sun Sep  1 17:08 2019          -</code></pre></div>
+<p>At this point you don&rsquo;t have a <code>pve-1</code> Boot Environment, because the
+file structure of the ESPs is currently just pointing to the default
+Proxmox config. For the <code>pve-1</code> dataset (or any dataset you create by
+hand) we can create the necessary files with the <code>init</code> command:</p>
+<div class="highlight"><pre style="background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-text" data-lang="text">root@caliban:~# ./beadm init pve-1
+Boot Environment for pve-1 has been generated successfully!</code></pre></div>
+<p>Now you can create a new Boot Environment using <code>create</code>:</p>
+<div class="highlight"><pre style="background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-text" data-lang="text">root@caliban:~# ./beadm init pve-2
+Running hook script &#39;pve-auto-removal&#39;..
+Running hook script &#39;zz-pve-efiboot&#39;..
+Re-executing &#39;/etc/kernel/postinst.d/zz-pve-efiboot&#39; in new private mount namespace..
+Copying and configuring kernels on /dev/disk/by-uuid/XXXX-XXXX
+        Copying kernel and creating boot-entry for 5.0.15-1-pve
+        Copying kernel and creating boot-entry for 5.0.21-1-pve
+Copying and configuring kernels on /dev/disk/by-uuid/YYYY-YYYY
+        Copying kernel and creating boot-entry for 5.0.15-1-pve
+        Copying kernel and creating boot-entry for 5.0.21-1-pve
+Created successfully</code></pre></div>
+<p>Now we have a second Boot Environment, but it is not active. As you
+can see right now (<code>N</code>) <code>pve-1</code> is active and after the next reboot (<code>R</code>)
+<code>pve-1</code> will be active again:</p>
+<div class="highlight"><pre style="background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-text" data-lang="text">root@caliban:~# ./beadm list
+Boot Environments on caliban:
+name                 state      used       ds      snaps    ubrr    refs    creation date                  origin
+----                 -----      ----       --      -----    ----    ----    ---------------------          ------
+pve-1                NR         1.20G      1.15G   44.8M    0B      1.15G   Sun Sep  1 17:08 2019          -
+pve-2                -          8K         8K      0B       0B      1.15G   Sun Oct  6 14:12 2019          rpool/ROOT/pve-1@2019-10-06-11:36:14</code></pre></div>
+<p>In order to activate the Boot Environment, run:</p>
+<div class="highlight"><pre style="background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-text" data-lang="text">root@caliban:~# ./beadm activate pve-2
+pve-2 has been activated successfully</code></pre></div>
+<p>Now you can see that the Boot Environment will be active after a reboot:</p>
+<div class="highlight"><pre style="background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-text" data-lang="text">root@caliban:~# ./beadm list
+Boot Environments on caliban:
+name                 state      used       ds      snaps    ubrr    refs    creation date                  origin
+----                 -----      ----       --      -----    ----    ----    ---------------------          ------
+pve-1                N          1.20G      1.15G   44.8M    0B      1.15G   Sun Sep  1 17:08 2019          -
+pve-2                R          8K         8K      0B       0B      1.15G   Sun Oct  6 14:12 2019          rpool/ROOT/pve-1@2019-10-06-11:36:14</code></pre></div>
+<p>If you don&rsquo;t like the name, you can rename <code>pve-2</code> with:</p>
+<div class="highlight"><pre style="background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-text" data-lang="text">root@caliban:~# ./beadm rename pve-2 pve-002
+root@caliban:~# ./beadm list
+Boot Environments on caliban:
+name                 state      used       ds      snaps    ubrr    refs    creation date                  origin
+----                 -----      ----       --      -----    ----    ----    ---------------------          ------
+pve-1                N          1.20G      1.15G   44.8M    0B      1.15G   Sun Sep  1 17:08 2019          -
+pve-002              R          8K         8K      0B       0B      1.15G   Sun Oct  6 14:12 2019          rpool/ROOT/pve-1@2019-10-06-11:36:14</code></pre></div>
+<p>You can also mount Boot Environments:</p>
+<div class="highlight"><pre style="background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-text" data-lang="text">root@caliban:~# ls
+beadm
+root@caliban:~# ./beadm mount pve-002 mountpoint
+Mounted successfully on &#39;mountpoint&#39;
+root@caliban:~# ls
+beadm  mountpoint
+root@caliban:~# ls mountpoint/
+bin  boot  dev  etc  home  lib  lib32  lib64  libx32  media  mnt  opt  proc  root  rpool  run  sbin  srv  sys  tmp  usr  var
+root@caliban:~# ./beadm umount pve-002
+Unmounted successfully
+root@caliban:~# ls
+beadm  mountpoint
+root@caliban:~# rmdir mountpoint</code></pre></div>
+<p>If you reboot, you should be booting into the active Boot
+Environment. Install something (e.g. <code>htop</code>), open it, then use
+<code>beadm</code> to activate the previous Boot Environment, reboot and notice
+how the program you&rsquo;ve just installed has dissapeared, because you
+just went back in time.</p>
+
+<p>If you plan on setting up your Proxmox host with Boot
+Environments, don&rsquo;t forget to make sure you have your ZFS datasets
+set up properly, I&rsquo;ve written about that in my <a href="https://tactical-documentation.github.io/post/poc-proxmox-and-boot-environments/">previous post</a>.</p>
+
+<h2 id="making-beadm-work-under-linux">Making <code>beadm</code> work under Linux</h2>
+
+<p>This part contains notes about which parts of the original <code>beadm</code> I
+changed to make it work on linux. You can skip this part if you
+don&rsquo;t care about the details that are not specific to Proxmox.</p>
+
+<p><code>beadm</code> is originally a Boot Environment manager for FreeBSD by
+<a href="https://vermaden.wordpress.com/">vermaden</a>. It is written in shell and enables you to create new Boot
+Environments or create them from ZFS snapshots, to activate, rename
+or destroy Boot Environments, list them and also mount and unmount
+them:</p>
+<div class="highlight"><pre style="background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-text" data-lang="text">root@caliban:~# beadm
+usage:
+  beadm activate &lt;beName&gt;
+  beadm create [-e nonActiveBe | -e beName@snapshot] &lt;beName&gt;
+  beadm create &lt;beName@snapshot&gt;
+  beadm destroy [-F] &lt;beName | beName@snapshot&gt;
+  beadm list [-a] [-s] [-D] [-H]
+  beadm rename &lt;origBeName&gt; &lt;newBeName&gt;
+  beadm mount &lt;beName&gt; [mountpoint]
+  beadm { umount | unmount } [-f] &lt;beName&gt;
+  beadm version</code></pre></div>
+<p>The script was originally about 900 LOC long and consisted of a
+bunch of helper functions followed by a big case statement, which
+takes care of running the code specific to the supplied
+parameter.</p>
+
+<p>After applying the following changes, apart from setting up the boot
+loader specific stuff, <code>beadm</code> should work on linux:</p>
+
+<h3 id="removing-the-bootloader-specific-code">Removing the bootloader specific code</h3>
+
+<p>Apart from managing the ZFS part it also takes care of managing
+FreeBSDs own bootloader or optionally <code>grub2</code>. I basically just
+removed these FreeBSD specific parts.</p>
+
+<h3 id="replacing-the-awk-code-of-the-list-command">Replacing the <code>awk</code> code of the <code>list</code> command</h3>
+
+<p>The <code>list</code> section of the script also contains a rather large piece of
+awk code for displaying the available/active Boot Environments. I&rsquo;ve
+replaced this part with shell, because I&rsquo;m not yet familiar enough
+with awk to use it inside of a script. Therefore the new <code>list</code>
+command is probably a bit simpler than it&rsquo;s FreeBSD parent. I also
+made sure that the correct next boot environment is marked, by
+looking into the content of <code>/etc/kernel/cmdline</code>.</p>
+
+<h3 id="replace-freebsd-date-with-it-s-linux-counterpart">Replace FreeBSD <code>date</code> with it&rsquo;s Linux counterpart</h3>
+
+<p>For the <code>destroy</code> operation I had to replace the line containing the
+<code>date</code> command, since FreeBSDs <code>date</code> supports the -f option, while the
+linux <code>date</code> command does not.</p>
+
+<h3 id="missing-u-parameter-in-the-linux-zfs-implementation">Missing <code>-u</code> Parameter in the Linux ZFS Implementation</h3>
+
+<p>The <code>rename</code> operation uses the <code>zfs rename</code> with the <code>-u</code> parameter. This
+parameter does not exist in linux and according to the FreeBSD
+man-page, it makes sure that filesystems are not remounted during
+the rename operation:</p>
+<div class="highlight"><pre style="background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-text" data-lang="text">-u	     Do	not remount file systems during	rename.	If a file system&#39;s
+        mountpoint	property is set	to legacy or none, file	system is not
+        unmounted even if this option is not given.</code></pre></div>
+<h3 id="mounting-zfs-datasets-under-linux">Mounting ZFS datasets under Linux</h3>
+
+<p>In order to make the <code>mount</code> operation work, the <code>-o zfsutil</code> option had
+to be applied to the <code>zfs mount</code> command.</p>
+
+<h3 id="zfs-automount-with-systemd">ZFS automount with systemd</h3>
+
+<p>As I worked on the linux version of beadm, I also noticed that apart
+from making sure all the ESPs are working as intended, when booting
+into a new Boot environment, only <code>/</code> was mounted.</p>
+
+<p>This was due to the systemd <code>zfs-mount</code> service not running. This
+service makes sure that all the zfs datasets are mounted on boot,
+but was failing to execute <code>zfs mount -a</code>, because there is more than
+one dataset that should be mounted to <code>/</code>.</p>
+
+<p>In order to fix this, we can use the <code>canmount</code> option and set it to
+<code>off</code> for all Boot Environments:</p>
+<div class="highlight"><pre style="background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-text" data-lang="text">canmount=on | off | noauto
+
+If this property is set to off, the file system cannot be mounted, and
+is ignored by zfs mount -a. Setting this property to off is similar to
+setting the mountpoint property to none, except that the dataset still
+has a normal mountpoint property, which can be inherited. Setting this
+property to off allows datasets to be used solely as a mechanism to
+inherit properties. One example of setting canmount=off is to have two
+datasets with the same mountpoint, so that the children of both
+datasets appear in the same directory, but might have different
+inherited characteristics.  When the noauto option is set, a dataset
+can only be mounted and unmounted explicitly. The dataset is not
+mounted automatically when the dataset is created or imported, nor is
+it mounted by the zfs mount -a command or unmounted by the zfs unmount
+-a command.
+
+This property is not inherited.</code></pre></div>
+<h2 id="making-beadm-work-with-proxmox">Making <code>beadm</code> work with Proxmox</h2>
+
+<p>This part describes the changes I made to <code>beadm</code> that were Proxmox
+specific.</p>
+
+<p>In my last post I described that the content of the Boot
+Environments could be housed in a ZFS dataset and then copied over
+to the ESPs (EFI System Partitions). I only proposed this however,
+because the amount of space boot environments need long term is
+higher than the amount of space that is available on a default
+Proxmox ESP and because shrinking a ZFS partition (which usually
+fills the rest of the harddrive) is not really something ZFS does.</p>
+
+<h3 id="recap-how-do-boot-environments-work-on-proxmox">Recap: How do Boot Environments work on Proxmox</h3>
+
+<ul>
+<li>systemd-boot is used</li>
+<li>since there can be multiple ESPs, they are not mounted at runtime</li>
+<li>a script called <code>pve-efiboot-tool</code> is used to refresh the bootloader
+configuration on all ESPs</li>
+<li>the <code>pve-efiboot-tool</code> calls another script <code>zz-pve-efiboot</code>, which
+iterates over all ESPs, mounts them, updates the boot loader
+configuration and finally unnmounts them</li>
+<li><code>zz-pve-efiboot</code> gets its information about which ESPs exist from
+<code>/etc/kernel/pve-efiboot-uuids</code> and the kernel commandline from
+<code>/etc/kernel/cmdline</code></li>
+<li>the kernel commandline contains the mountpoint for <code>/</code>, which is the
+part of this file we need to exchange in order to activate a Boot
+Environment</li>
+<li>In the last post I proposed the use of a template file for the
+kernel commandline <code>/etc/kernel/cmdline.template</code>, from which the
+<code>/etc/kernel/cmdline</code> file is generated before calling
+<code>pve-efiboot-tool refresh</code>. We will be using such a file here.</li>
+<li>On the ESPs we need to create a directory structure housing the
+Boot Environment configuration files</li>
+</ul>
+
+<h3 id="check-for-etc-kernel-cmdline-dot-template">Check for <code>/etc/kernel/cmdline.template</code></h3>
+
+<p>We need to make sure that the <code>beadm</code> script fails if no
+<code>/etc/kernel/cmdline.template</code> is found or if it is found, but does
+not contain the correct string (&rdquo;__BE_NAME&rdquo;), which we replace to
+create the <code>cmdline</code> file.</p>
+<div class="highlight"><pre style="background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-text" data-lang="text">if [ ! -f /etc/kernel/cmdline.template ] || ! $(grep -q &#34;__BE_NAME&#34; /etc/kernel/cmdline.template)
+then
+  echo &#34;ERROR: /etc/kernel/cmdline.template not found!&#34;
+  # [...]
+  exit 1
+fi</code></pre></div>
+<h3 id="temporary-files">Temporary files</h3>
+
+<p><code>beadm</code> usually is able to tell which Boot Environment will be active
+after the next boot, by simply looking into the ESP or boot loader
+configuration. Since on Proxmox the ESPs are not always mounted, we
+keep this information inside <code>/tmp/beadm/</code>. We store a version of the
+current <code>loader.conf</code> as well as the name of the next active boot
+environment in /tmp/beadm so we don&rsquo;t have to mount/unmount ESPs
+every time we use <code>list</code>. We do this in a helper function:</p>
+<div class="highlight"><pre style="background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-text" data-lang="text">__get_active_be_from_esp() {
+  if [ ! -f /tmp/beadm/loader.conf ]
+  then
+    mount /dev/disk/by-uuid/$(cat /etc/kernel/pve-efiboot-uuids | head -n 1) /boot/efi
+    mkdir -p /tmp/beadm/
+    cp /boot/efi/loader/loader.conf /tmp/beadm/loader.conf
+    default_entry=&#34;$(cat /tmp/beadm/loader.conf | grep default | cut -d &#39; &#39; -f2 | sed &#39;s/-\*$//&#39;)&#34;
+    next_boot_environment=&#34;$(cat /boot/efi/loader/entries/$(ls /boot/efi/loader/entries/ | \
+                             grep $default_entry | head -n 1) | grep options | tr &#39; &#39; &#39;\n&#39; | \
+                             grep root= | cut -d &#39;/&#39; -f3)&#34;
+    echo $next_boot_environment &gt; /tmp/beadm/next_boot_environment
+    # [...]
+    umount /boot/efi
+  fi
+}</code></pre></div>
+<h3 id="the-init-parameter">The <code>init</code> Parameter</h3>
+
+<p>The init operation is a new operation that was added to <code>beadm</code> so a
+manually created dataset or a dataset that has no Boot Environment
+files on the ESP (such as the default <code>/rpool/ROOT/pve-1</code> dataset)
+can be converted to a working Boot Environment. This command
+basically just creates some files on the ESPs.</p>
+
+<p>This one is new and quite important: use it to initialize a Boot
+Environment for a dataset that already exists (you probably only
+need it for <code>rpool/ROOT/pve-1</code> or whenever you&rsquo;ve created snapshots
+by hand), but it&rsquo;s nice to have.</p>
+<div class="highlight"><pre style="background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-text" data-lang="text">if $(zfs get canmount rpool/ROOT/$be_name | grep -q on)
+then
+  zfs set canmount=off ${POOL}/${BEDS}/$be_name
+fi
+
+__get_active_be_from_esp
+
+# [...]
+
+old_be_name=&#34;$(cat /etc/kernel/cmdline | tr &#39; &#39; &#39;\n&#39; | grep root | cut -d &#39;/&#39; -f3)&#34;
+
+cat /etc/kernel/cmdline.template | sed &#34;s/__BE_NAME/$be_name/&#34; &gt; /etc/kernel/cmdline
+
+pve-efiboot-tool refresh
+
+cat /etc/kernel/cmdline.template | sed &#34;s/__BE_NAME/$old_be_name/&#34; &gt; /etc/kernel/cmdline
+
+for esp in $(cat /etc/kernel/pve-efiboot-uuids)
+do
+  mount /dev/disk/by-uuid/$esp /boot/efi
+  mkdir -p /boot/efi/env/$be_name
+  cp -r /boot/efi/EFI/proxmox/* /boot/efi/env/$be_name/
+  cat /boot/efi/loader/loader.conf | sed &#34;/default/c\default $be_name-*&#34; &gt; /boot/efi/env/$be_name/loader.conf
+  for entry in $(ls /boot/efi/loader/entries/ | grep proxmox-.*-pve.conf)
+  do
+    new_entry=&#34;$(echo $entry | sed &#34;s/proxmox/$be_name/;s/-pve//&#34;)&#34;
+    cp /boot/efi/loader/entries/$entry /boot/efi/loader/entries/$new_entry
+    sed -i &#34;s/EFI/env/&#34; /boot/efi/loader/entries/$new_entry
+    sed -i &#34;s/proxmox/$be_name/&#34; /boot/efi/loader/entries/$new_entry
+    sed -i &#34;s/Proxmox Virtual Environment/$be_name/&#34; /boot/efi/loader/entries/$new_entry
+  done
+  rm -f /boot/efi/loader/loader.conf
+  cp /tmp/beadm/loader.conf /boot/efi/loader/loader.conf
+  umount /boot/efi
+done</code></pre></div>
+<h3 id="the-list-parameter">The <code>list</code> Parameter</h3>
+
+<p>We check if we find a file containing the loader.conf in /tmp, if
+not we mount a ESP and copy loader.conf to /tmp, unmount the ESP
+and use this file to store the name of the next active BE. Apart
+from that, we can just create some output containing basically the
+same information as the original <code>beadm list</code> produces:</p>
+<div class="highlight"><pre style="background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-text" data-lang="text">zfs_list=&#34;$(zfs list -H -t filesystem,snapshot,volume -s creation -o name,used,usedds,usedbysnapshots,usedrefreserv,refer,creation,origin -r $POOL/$BEDS | grep &#34;^$POOL/$BEDS/&#34; | sed &#39;s/\t/,/g;s/\n/;/g;s/ /_/g&#39;)&#34;
+
+__get_active_be_from_esp
+
+printf &#34;%-20s %-10s %-10s %-7s %-8s %-7s %-7s %-30s %-10s\n&#34; name state used ds snaps ubrr refs &#34;creation date&#34; origin
+printf &#34;%-20s %-10s %-10s %-7s %-8s %-7s %-7s %-30s %-10s\n&#34; ---- ----- ---- -- ----- ---- ---- --------------------- ------
+for line in $(echo $zfs_list | tr &#39;;&#39; &#39;\n&#39;); do
+  BE_NAME=&#34;$(echo $line | cut -d &#39;,&#39; -f1 | sed &#34;s/^$POOL\/$BEDS\///&#34;)&#34;
+  BE_ACTIVE=&#34;$(if [ &#34;$ROOTFS&#34; = &#34;$(echo $line | cut -d &#39;,&#39; -f1)&#34; ]; then echo N; else echo &#39; &#39;; fi)&#34;
+  BE_NEXT=&#34;$(if [ &#34;$BE_NAME&#34; = &#34;$(cat /tmp/beadm/next_boot_environment)&#34; ]; then echo R; else echo &#39; &#39;; fi)&#34;
+  BE_STATE=&#34;$(if [ &#34;$BE_ACTIVE$BE_NEXT&#34; = &#34;  &#34; ]; then echo &#34;-&#34;; else echo &#34;$BE_ACTIVE$BE_NEXT&#34;; fi)&#34;
+  BE_USED=&#34;$(echo $line | cut -d &#39;,&#39; -f2)&#34;
+  BE_USEDDS=&#34;$(echo $line | cut -d &#39;,&#39; -f3)&#34;
+  BE_USEDBYSNAPSHOTS=&#34;$(echo $line | cut -d &#39;,&#39; -f4)&#34;
+  BE_USEDREFRESERV=&#34;$(echo $line | cut -d &#39;,&#39; -f5)&#34;
+  BE_REFER=&#34;$(echo $line | cut -d &#39;,&#39; -f6)&#34;
+  BE_DATE=&#34;$(echo $line | cut -d &#39;,&#39; -f7 | sed &#39;s/_/ /g&#39;)&#34;
+  BE_ORIGIN=&#34;$(echo $line | cut -d &#39;,&#39; -f8)&#34;
+
+
+  if ! echo $line | cut -d &#39;,&#39; -f 1 | grep -q &#34;@&#34;; then
+    printf &#34;%-20s %-10s %-10s %-7s %-8s %-7s %-7s %-30s %-10s\n&#34; $BE_NAME $BE_STATE $BE_USED $BE_USEDDS $BE_USEDBYSNAPSHOTS $BE_USEDREFRESERV $BE_REFER &#34;$BE_DATE&#34; &#34;$BE_ORIGIN&#34;
+  fi
+done</code></pre></div>
+<h3 id="the-create-parameter">The <code>create</code> Parameter</h3>
+
+<p>The <code>create</code> operation is used to create a new bootable
+dataset. After the operation the newly created Boot Environment is
+not active.</p>
+
+<p>In order to make this operation work with Proxmox, first we need to
+grab a copy of the currently active Boot Environment from one ESP
+and store it in <code>/tmp/beadm</code>.</p>
+
+<p>Then we create a new <code>/etc/kernel/cmdline</code> from the template file and
+run <code>pve-efiboot-tool refresh</code>, which creates a valid bootloader
+configuration on all of our ESPs. Next we copy the kernel files
+into $ESP/env/$BE_NAME, rename all the conf files and restore the
+previous loader.conf that we saved in <code>/tmp/beadm/loader.conf</code>. This
+way we can create a new Boot Environment without activating it.</p>
+<div class="highlight"><pre style="background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-text" data-lang="text">zfs set canmount=off ${POOL}/${BEDS}/$be_name
+
+__get_active_be_from_esp
+
+old_be_name=&#34;$(cat /etc/kernel/cmdline | tr &#39; &#39; &#39;\n&#39; | grep root | cut -d &#39;/&#39; -f3)&#34;
+cat /etc/kernel/cmdline.template | sed &#34;s/__BE_NAME/$be_name/&#34; &gt; /etc/kernel/cmdline
+pve-efiboot-tool refresh
+cat /etc/kernel/cmdline.template | sed &#34;s/__BE_NAME/$old_be_name/&#34; &gt; /etc/kernel/cmdline
+
+for esp in $(cat /etc/kernel/pve-efiboot-uuids)
+do
+  mount /dev/disk/by-uuid/$esp /boot/efi
+  mkdir -p /boot/efi/env/$be_name
+  cp -r /boot/efi/EFI/proxmox/* /boot/efi/env/$be_name/
+  cat /boot/efi/loader/loader.conf | sed &#34;/default/c\default $be_name-*&#34; &gt; /boot/efi/env/$be_name/loader.conf
+  for entry in $(ls /boot/efi/loader/entries/ | grep proxmox-.*-pve.conf)
+  do
+    new_entry=&#34;$(echo $entry | sed &#34;s/proxmox/$be_name/;s/-pve//&#34;)&#34;
+    cp /boot/efi/loader/entries/$entry /boot/efi/loader/entries/$new_entry
+    sed -i &#34;s/EFI/env/&#34; /boot/efi/loader/entries/$new_entry
+    sed -i &#34;s/proxmox/$be_name/&#34; /boot/efi/loader/entries/$new_entry
+    sed -i &#34;s/Proxmox Virtual Environment/$be_name/&#34; /boot/efi/loader/entries/$new_entry
+  done
+  rm /boot/efi/loader/loader.conf
+  cp /tmp/beadm/loader.conf /boot/efi/loader/loader.conf
+  umount /boot/efi
+done</code></pre></div>
+<h3 id="the-activate-parameter">The <code>activate</code> Parameter</h3>
+
+<p>Here we activate a Boot Environment, that has already been created,
+so we only need to mount all the ESPs and copy the correct conf
+file so it replaces the loader.conf. We also need to write the name
+of the active Boot Environment to <code>/tmp/beadm</code>.</p>
+<div class="highlight"><pre style="background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-text" data-lang="text">for esp in $(cat /etc/kernel/pve-efiboot-uuids)
+do
+  mount /dev/disk/by-uuid/$esp /boot/efi
+  rm -f /boot/efi/loader/loader.conf
+
+  # [...]
+
+  cp /boot/efi/env/$be_name/loader.conf /boot/efi/loader/loader.conf
+
+  umount /boot/efi
+done</code></pre></div>
+<h3 id="the-rename-parameter">The <code>rename</code> Parameter</h3>
+
+<p>Here, we need to rename the folder inside the <code>env</code> directory as well
+as the conf files in the entries directory. We also have to make
+sure they point to the new directory.</p>
+<div class="highlight"><pre style="background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-text" data-lang="text">for esp in $(cat /etc/kernel/pve-efiboot-uuids)
+do
+  mount /dev/disk/by-uuid/$esp /boot/efi
+  mv /boot/efi/env/$be_name/ /boot/efi/env/$new_be_name/
+  sed -i &#34;s/$be_name/$new_be_name/&#34; /boot/efi/env/$new_be_name/loader.conf
+  sed -i &#34;s/$be_name/$new_be_name/&#34; /boot/efi/loader/loader.conf
+  for entry in $(ls /boot/efi/loader/entries/ | grep $be_name)
+  do
+    sed -i &#34;s/$be_name/$new_be_name/&#34; /boot/efi/loader/entries/$entry
+    new_entry_name=$(echo $entry | sed &#34;s/$be_name/$new_be_name/&#34;)
+    mv /boot/efi/loader/entries/$entry /boot/efi/loader/entries/$new_entry_name
+  done
+  umount /boot/efi
+done</code></pre></div>
+<h3 id="the-destroy-parameter">The <code>destroy</code> Parameter</h3>
+
+<p>We need to delete the content of the <code>env</code> directory as well as the
+config files.</p>
+<div class="highlight"><pre style="background-color:#f0f3f3;-moz-tab-size:4;-o-tab-size:4;tab-size:4"><code class="language-text" data-lang="text">for esp in $(cat /etc/kernel/pve-efiboot-uuids)
+do
+  mount /dev/disk/by-uuid/$esp /boot/efi
+  rm -rf /boot/efi/env/$be_name/
+  for entry in $(ls /boot/efi/loader/entries/ | grep $be_name)
+  do
+    rm -f /boot/efi/loader/entries/$entry
+  done
+  umount /boot/efi
+done</code></pre></div>
+<h2 id="conclusion-and-further-work">Conclusion and Further Work</h2>
+
+<p>This post has introduced <code>beadm</code>, a Boot Environment Manager for the
+Proxmox Virtualization Plattform, which has been forked from it&rsquo;s
+FreeBSD counterpart. First the usage of <code>beadm</code> is showcased, then
+some notes on porting <code>beadm</code> from FreeBSD to Linux are presented
+and finally the Proxmox specific additions to <code>beadm</code> are explained.</p>
+
+<p>The way <code>beadm</code> is implemented in this post could partially be
+considered bad design, however this is due to <code>beadm</code> being an
+external tool and not part of the native Proxmox tooling. The scope
+of this was to implement Boot Environments without changing the
+Proxmox code. I&rsquo;m sure the design will be improved if this
+functionality is added to Proxmox. The following Improvements can be
+made:</p>
+
+<ul>
+<li>deduplication of kernel files (Reference counting could help to
+manage this)</li>
+<li>minimize the amount of mount / unmount operations</li>
+<li>add the ability to inject kernels into Boot Environments</li>
+<li>add the ability to prune kernels from Boot Environments</li>
+<li>add the ability to export / import Boot Environments together with
+the relevant files from the ESPs</li>
+</ul>
+
+<p>Now that Boot Environments on Proxmox (or more general on Linux) are
+a possibility, the next thing to do could be to write up how Boot
+Environments can be used in practice. For now the following
+scenarios, which could be interesting come to mind:</p>
+
+<ul>
+<li>Update systems using a new Boot Environment using <code>chroot</code></li>
+<li>Migrate systems by moving Boot Environments</li>
+<li>Use a copy of a system in order to do forensic work</li>
+<li>Find out what has changed between two system states by comparing
+the filesystem snapshots</li>
+<li>Use the same &ldquo;base&rdquo; Boot Environment to run on multiple bare metal
+/ virtualized machines, make an update on the base Environment,
+then push it out to multiple systems.</li>
+<li>Rollbacks in case of system failure: Reduce MTTR on bare metal systems</li>
+</ul>
+
+  </div>
+
+  <div id=links>
+    
+    
+      <a class="basic-alignment left" href="https://tactical-documentation.github.io/post/poc-proxmox-and-boot-environments/">Proof of Concept: Adding Boot Environments to Proxmox VE 6 &raquo;</a>
+    
+  </div>
+</section>
+
+</body>
+</html>
+
+
+

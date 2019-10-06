@@ -6,7 +6,7 @@
     <description>Recent content in Tags on tactical-documentation</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
-    <lastBuildDate>Wed, 28 Aug 2019 00:00:00 +0000</lastBuildDate>
+    <lastBuildDate>Sun, 06 Oct 2019 00:00:00 +0000</lastBuildDate>
     
 	<atom:link href="https://tactical-documentation.github.io/tags/index.xml" rel="self" type="application/rss+xml" />
     
@@ -14,7 +14,7 @@
     <item>
       <title>boot environments</title>
       <link>https://tactical-documentation.github.io/tags/boot-environments/</link>
-      <pubDate>Wed, 28 Aug 2019 00:00:00 +0000</pubDate>
+      <pubDate>Sun, 06 Oct 2019 00:00:00 +0000</pubDate>
       
       <guid>https://tactical-documentation.github.io/tags/boot-environments/</guid>
       <description></description>
@@ -23,7 +23,7 @@
     <item>
       <title>proxmox</title>
       <link>https://tactical-documentation.github.io/tags/proxmox/</link>
-      <pubDate>Wed, 28 Aug 2019 00:00:00 +0000</pubDate>
+      <pubDate>Sun, 06 Oct 2019 00:00:00 +0000</pubDate>
       
       <guid>https://tactical-documentation.github.io/tags/proxmox/</guid>
       <description></description>
@@ -32,7 +32,7 @@
     <item>
       <title>systemd-boot</title>
       <link>https://tactical-documentation.github.io/tags/systemd-boot/</link>
-      <pubDate>Wed, 28 Aug 2019 00:00:00 +0000</pubDate>
+      <pubDate>Sun, 06 Oct 2019 00:00:00 +0000</pubDate>
       
       <guid>https://tactical-documentation.github.io/tags/systemd-boot/</guid>
       <description></description>
@@ -41,7 +41,7 @@
     <item>
       <title>zfs</title>
       <link>https://tactical-documentation.github.io/tags/zfs/</link>
-      <pubDate>Wed, 28 Aug 2019 00:00:00 +0000</pubDate>
+      <pubDate>Sun, 06 Oct 2019 00:00:00 +0000</pubDate>
       
       <guid>https://tactical-documentation.github.io/tags/zfs/</guid>
       <description></description>

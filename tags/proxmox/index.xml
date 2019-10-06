@@ -6,7 +6,7 @@
     <description>Recent content in proxmox on tactical-documentation</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
-    <lastBuildDate>Wed, 28 Aug 2019 00:00:00 +0000</lastBuildDate>
+    <lastBuildDate>Sun, 06 Oct 2019 00:00:00 +0000</lastBuildDate>
     
 	<atom:link href="https://tactical-documentation.github.io/tags/proxmox/index.xml" rel="self" type="application/rss+xml" />
     
@@ -27,6 +27,16 @@
       
       <guid>https://tactical-documentation.github.io/post/poc-proxmox-and-boot-environments/</guid>
       <description>Dear Reader, this time I would like to invite you onto a small journey: To boldly go where no man has gone beforeAlright, that&amp;rsquo;s not true, but I think it&amp;rsquo;s the first time someone documents this kind of thing in the context of Proxmox . We&amp;rsquo;re about to embark on a journey to make your Proxmox host quite literally immortal. Also since what we are essentially doing here is only a Proof of concept, you probably shouldn&amp;rsquo;t use it in production, but as it&amp;rsquo;s really amazing, so you might want to try it out in a test environment.</description>
+    </item>
+    
+    <item>
+      <title>Introducing a Boot Environment Manager for Proxmox</title>
+      <link>https://tactical-documentation.github.io/post/a-boot-environment-manager-for-proxmox/</link>
+      <pubDate>Sun, 06 Oct 2019 00:00:00 +0000</pubDate>
+      
+      <guid>https://tactical-documentation.github.io/post/a-boot-environment-manager-for-proxmox/</guid>
+      <description>This post introduces a fork of the FreeBSD beadm utility which can be used to manage Boot Environments on Proxmox ZFS Installations.
+In this Post I will showcase how to use the beadm Boot Environment manager in Proxmox. After the showcase there are some notes on what I did to make beadm run on Linux in general and finally a part about what has been changed in order to make beadm work with Proxmox specifically.</description>
     </item>
     
   </channel>
